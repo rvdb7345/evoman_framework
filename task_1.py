@@ -12,6 +12,10 @@ from demo_controller import player_controller
 import numpy as np
 from tqdm import tqdm
 import random
+import multiprocessing as mp
+from multiprocessing import Pool
+
+from joblib import Parallel, delayed
 
 
 experiment_name = 'task_1'
@@ -47,68 +51,94 @@ def mutation(population, mutation_chance):
 
     return population
 
-
-n_hidden_neurons = 10  # number of
-enemies = [7, 8]  # enemies with which to test the solutions
-
-# initializes environment with ai player using random controller, playing against static enemy
-# initializes simulation in multi evolution mode, for multiple static enemies.
-env = Environment(experiment_name=experiment_name,
-                  enemies=enemies,
-                  multiplemode="yes",
-                  playermode="ai",
-                  player_controller=player_controller(n_hidden_neurons),
-                  enemymode="static",
-                  level=2,
-                  speed="fastest",
-                  logs="off")
-
-# default environment fitness is assumed for experiment
-
-env.state_to_log() # checks environment state
-
-# the length of the input
-n_vars = (env.get_num_sensors()+1)*n_hidden_neurons + (n_hidden_neurons+1)*5
-
-# set the parameters
-lower_bound = -1
-upper_bound = 1
-population_size = 6
-n_generations = 5
-mutation_chance = 0.2
-
-# create random population
-population_of_solutions = np.random.uniform(lower_bound, upper_bound, (population_size, n_vars))
+def simulate(solution):
+    n_hidden_neurons = 10  # number of
+    enemies = [7, 8]  # enemies with which to test the solutions
+    env = Environment(experiment_name=experiment_name,
+                      enemies=enemies,
+                      multiplemode="yes",
+                      playermode="ai",
+                      player_controller=player_controller(n_hidden_neurons),
+                      enemymode="static",
+                      level=2,
+                      speed="fastest",
+                      logs="off")
+    return env.play(pcont=solution)
 
 
-for gen_iter in tqdm(range(n_generations)):
-    fitnesses = []
+if __name__ == '__main__':
+    n_hidden_neurons = 10  # number of
+    enemies = [7, 8]  # enemies with which to test the solutions
 
-    # play with the different solutions
+    # initializes environment with ai player using random controller, playing against static enemy
+    # initializes simulation in multi evolution mode, for multiple static enemies.
+
+    # default environment fitness is assumed for experiment
+    env = Environment(experiment_name=experiment_name,
+                      enemies=enemies,
+                      multiplemode="yes",
+                      playermode="ai",
+                      player_controller=player_controller(n_hidden_neurons),
+                      enemymode="static",
+                      level=2,
+                      speed="fastest",
+                      logs="off")
+
+    env.state_to_log() # checks environment state
+
+    # the length of the input
+    n_vars = (env.get_num_sensors()+1)*n_hidden_neurons + (n_hidden_neurons+1)*5
+
+    # set the parameters
+    lower_bound = -1
+    upper_bound = 1
+    population_size = 6
+    n_generations = 5
+    mutation_chance = 0.2
+    num_cores = mp.cpu_count()
+
+    # create random population
+    population_of_solutions = np.random.uniform(lower_bound, upper_bound, (population_size, n_vars))
+
+
+    for gen_iter in tqdm(range(n_generations)):
+        fitnesses = []
+
+        pool = Pool(mp.cpu_count())
+        pool_list = pool.map(simulate, (population_of_solutions))
+        pool.close()
+        pool.join()
+
+        # print(pool_list)
+        fitnesses = [x[0] for x in pool_list]
+
+
+        # # the normal non parallelised loop
+        # # play with the different solutions
+        # for i in range(population_size):
+        #     results = env.play(pcont=population_of_solutions[i])
+        #     fitness, player_life, enemy_life, run_time = results
+        #     fitnesses.append(fitness)
+
+        # sort the population form worst to best
+        sols_worst_to_best = np.array([x for _,x in sorted(list(zip(fitnesses, population_of_solutions)), key=lambda x: x[0])])
+
+        # remove the worst solutions
+        num_to_kill_off = int(len(sols_worst_to_best)/2)
+        sols_worst_to_best[0:num_to_kill_off] = 0
+
+        # repopulate the solution pool by reproduction
+        population_of_solutions = crossover(sols_worst_to_best, population_size, num_to_kill_off, n_vars)
+
+        # randomly mutate some individuals
+        population_of_solutions = mutation(population_of_solutions, mutation_chance)
+
+        print('Generation: {}, with an average fitness: {}'.format(gen_iter, np.mean(fitnesses)))
+
+    # play with the final solutions
     for i in range(population_size):
         results = env.play(pcont=population_of_solutions[i])
         fitness, player_life, enemy_life, run_time = results
         fitnesses.append(fitness)
 
-    # sort the population form worst to best
-    sols_worst_to_best = np.array([x for _,x in sorted(list(zip(fitnesses, population_of_solutions)), key=lambda x: x[0])])
-
-    # remove the worst solutions
-    num_to_kill_off = int(len(sols_worst_to_best)/2)
-    sols_worst_to_best[0:num_to_kill_off] = 0
-
-    # repopulate the solution pool by reproduction
-    population_of_solutions = crossover(sols_worst_to_best, population_size, num_to_kill_off, n_vars)
-
-    # randomly mutate some individuals
-    population_of_solutions = mutation(population_of_solutions, mutation_chance)
-
-    print('Generation: {}, with an average fitness: {}'.format(gen_iter, np.mean(fitnesses)))
-
-# play with the final solutions
-for i in range(population_size):
-    results = env.play(pcont=population_of_solutions[i])
-    fitness, player_life, enemy_life, run_time = results
-    fitnesses.append(fitness)
-
-print('Final population solution has an average fitness of: {}'.format(np.mean(fitnesses)))
+    print('Final population solution has an average fitness of: {}'.format(np.mean(fitnesses)))
