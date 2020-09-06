@@ -22,6 +22,7 @@ experiment_name = 'task_1'
 if not os.path.exists(experiment_name):
     os.makedirs(experiment_name)
 
+
 # function that produces the offspring by combining the genomes
 def crossover(remaining_solutions, population_size, num_to_kill_off, n_vars):
     children_to_spawn = num_to_kill_off
@@ -51,9 +52,12 @@ def mutation(population, mutation_chance):
 
     return population
 
-def simulate(solution):
-    n_hidden_neurons = 10  # number of
-    enemies = [7, 8]  # enemies with which to test the solutions
+
+# this function runs the simulation
+def simulate(n_hidden_neurons, enemies, solution):
+    # n_hidden_neurons = 10  # number of
+    # enemies = [7, 8]  # enemies with which to test the solutions
+
     env = Environment(experiment_name=experiment_name,
                       enemies=enemies,
                       multiplemode="yes",
@@ -70,10 +74,8 @@ if __name__ == '__main__':
     n_hidden_neurons = 10  # number of
     enemies = [7, 8]  # enemies with which to test the solutions
 
-    # initializes environment with ai player using random controller, playing against static enemy
-    # initializes simulation in multi evolution mode, for multiple static enemies.
 
-    # default environment fitness is assumed for experiment
+    # initialised once to get the n_vars
     env = Environment(experiment_name=experiment_name,
                       enemies=enemies,
                       multiplemode="yes",
@@ -84,7 +86,7 @@ if __name__ == '__main__':
                       speed="fastest",
                       logs="off")
 
-    env.state_to_log() # checks environment state
+    env.state_to_log()  # checks environment state
 
     # the length of the input
     n_vars = (env.get_num_sensors()+1)*n_hidden_neurons + (n_hidden_neurons+1)*5
@@ -100,18 +102,21 @@ if __name__ == '__main__':
     # create random population
     population_of_solutions = np.random.uniform(lower_bound, upper_bound, (population_size, n_vars))
 
-
     for gen_iter in tqdm(range(n_generations)):
+
+        # create input including the number of neurons and the enemies so this isn't in the simulate function
+        pool_input = [(n_hidden_neurons, enemies, sol) for sol in population_of_solutions]
+
         fitnesses = []
 
+        # run the different solutions in parallel
         pool = Pool(mp.cpu_count())
-        pool_list = pool.map(simulate, (population_of_solutions))
+        pool_list = pool.starmap(simulate, pool_input)
         pool.close()
         pool.join()
 
-        # print(pool_list)
+        # get the fitnesses from the total results formatted as [(f, p, e, t), (...), ...]
         fitnesses = [x[0] for x in pool_list]
-
 
         # # the normal non parallelised loop
         # # play with the different solutions
@@ -121,7 +126,8 @@ if __name__ == '__main__':
         #     fitnesses.append(fitness)
 
         # sort the population form worst to best
-        sols_worst_to_best = np.array([x for _,x in sorted(list(zip(fitnesses, population_of_solutions)), key=lambda x: x[0])])
+        sols_worst_to_best = np.array([x for _,x in sorted(list(zip(fitnesses, population_of_solutions)),
+                                                           key=lambda x: x[0])])
 
         # remove the worst solutions
         num_to_kill_off = int(len(sols_worst_to_best)/2)
