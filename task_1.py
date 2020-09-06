@@ -32,7 +32,6 @@ def crossover(remaining_solutions, population_size, num_to_kill_off, n_vars):
     parent1 = np.random.randint(len(remaining_solutions) - num_to_kill_off, population_size, size=children_to_spawn)
     parent2 = np.random.randint(len(remaining_solutions) - num_to_kill_off, population_size, size=children_to_spawn)
 
-
     # create the genomes of the children by taking the first have of the weights from one partens
     # and the rest from another parent
     for i in range(children_to_spawn):
@@ -50,6 +49,15 @@ def mutation(population, mutation_chance):
         if random.random() < mutation_chance:
             index_point_mutation = random.randint(0, len(population[i]))
             population[i][index_point_mutation] = -population[i][index_point_mutation]
+
+    return population
+
+# mutate one of the weights of a solution with a certain chance
+def multi_mutation(population, mutation_chance):
+    for i in range(len(population)):
+        for j in range(len(population[i])):
+            if random.random() < mutation_chance:
+                population[i][j] = -population[i][j]
 
     return population
 
@@ -95,9 +103,9 @@ if __name__ == '__main__':
     # set the parameters
     lower_bound = -1
     upper_bound = 1
-    population_size = 6
-    n_generations = 5
-    mutation_chance = 0.2
+    population_size = 46
+    n_generations = 10
+    mutation_chance = 0.001
     num_cores = mp.cpu_count()
 
     # create random population
@@ -146,7 +154,7 @@ if __name__ == '__main__':
         population_of_solutions = crossover(sols_worst_to_best, population_size, num_to_kill_off, n_vars)
 
         # randomly mutate some individuals
-        population_of_solutions = mutation(population_of_solutions, mutation_chance)
+        population_of_solutions = multi_mutation(population_of_solutions, mutation_chance)
 
 
 
