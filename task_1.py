@@ -148,13 +148,19 @@ if __name__ == '__main__':
         # randomly mutate some individuals
         population_of_solutions = mutation(population_of_solutions, mutation_chance)
 
+    # run final simulation with the end population
+    pool_input = [(n_hidden_neurons, enemies, sol) for sol in population_of_solutions]
 
+    fitnesses = []
 
-    # play with the final solutions
-    for i in range(population_size):
-        results = env.play(pcont=population_of_solutions[i])
-        fitness, player_life, enemy_life, run_time = results
-        fitnesses.append(fitness)
+    # run the different solutions in parallel
+    pool = Pool(mp.cpu_count())
+    pool_list = pool.starmap(simulate, pool_input)
+    pool.close()
+    pool.join()
+
+    # get the fitnesses from the total results formatted as [(f, p, e, t), (...), ...]
+    fitnesses = [x[0] for x in pool_list]
 
     # save final result
     mean_fitness = np.mean(fitnesses)
