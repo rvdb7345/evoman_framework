@@ -14,6 +14,7 @@ from tqdm import tqdm
 import random
 import multiprocessing as mp
 from multiprocessing import Pool
+import matplotlib.pyplot as plt
 
 from joblib import Parallel, delayed
 
@@ -67,13 +68,13 @@ def simulate(n_hidden_neurons, enemies, solution):
                       level=2,
                       speed="fastest",
                       logs="off")
+
     return env.play(pcont=solution)
 
 
 if __name__ == '__main__':
     n_hidden_neurons = 10  # number of
     enemies = [7, 8]  # enemies with which to test the solutions
-
 
     # initialised once to get the n_vars
     env = Environment(experiment_name=experiment_name,
@@ -102,6 +103,9 @@ if __name__ == '__main__':
     # create random population
     population_of_solutions = np.random.uniform(lower_bound, upper_bound, (population_size, n_vars))
 
+    mean_fitness_per_generation = np.zeros(n_generations + 1)  # +1 for generation 0
+    std_fitness_per_generation = np.zeros(n_generations + 1)  # +1 for generation 0
+
     for gen_iter in tqdm(range(n_generations)):
 
         # create input including the number of neurons and the enemies so this isn't in the simulate function
@@ -125,6 +129,11 @@ if __name__ == '__main__':
         #     fitness, player_life, enemy_life, run_time = results
         #     fitnesses.append(fitness)
 
+        mean_fitness = np.mean(fitnesses)
+        mean_fitness_per_generation[gen_iter] = mean_fitness
+        std_fitness_per_generation[gen_iter] = np.std(fitnesses)
+        print('Generation: {}, with an average fitness: {}'.format(gen_iter, mean_fitness))
+
         # sort the population form worst to best
         sols_worst_to_best = np.array([x for _,x in sorted(list(zip(fitnesses, population_of_solutions)),
                                                            key=lambda x: x[0])])
@@ -139,12 +148,26 @@ if __name__ == '__main__':
         # randomly mutate some individuals
         population_of_solutions = mutation(population_of_solutions, mutation_chance)
 
-        print('Generation: {}, with an average fitness: {}'.format(gen_iter, np.mean(fitnesses)))
+
 
     # play with the final solutions
     for i in range(population_size):
         results = env.play(pcont=population_of_solutions[i])
         fitness, player_life, enemy_life, run_time = results
         fitnesses.append(fitness)
+
+    # save final result
+    mean_fitness = np.mean(fitnesses)
+    mean_fitness_per_generation[n_generations] = mean_fitness
+    std_fitness_per_generation[n_generations] = np.std(fitnesses)
+
+    # plot the results over time
+    plt.figure()
+    plt.title('Fitness per generation')
+    plt.errorbar(np.arange(0, n_generations + 1), mean_fitness_per_generation, yerr=std_fitness_per_generation)
+    plt.grid()
+    plt.xlabel('Generation (#)')
+    plt.ylabel('Fitness')
+    plt.show()
 
     print('Final population solution has an average fitness of: {}'.format(np.mean(fitnesses)))
