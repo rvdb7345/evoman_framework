@@ -1,6 +1,7 @@
 ################################
 # EvoMan FrameWork - V1.0 2016 #
-# Author: group 77             #
+# Author: group 77  
+# Srinivas Muralidharan           #
 #                              #
 ################################
 
