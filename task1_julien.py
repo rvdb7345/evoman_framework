@@ -62,7 +62,7 @@ def crossover_and_mutation(parent1, parent2, prob1, prob2, nn_topology, mutation
 
         # add noise (mutation)
         if np.random.uniform(0, 1) < mutation_chance:
-            noise = np.random.normal(0, 1)
+            noise = np.random.normal(0, 1) # this can be changed (uniform distribution)
             child_params["W" + str_layer] += noise
             child_params["b" + str_layer] += noise
 
@@ -96,6 +96,7 @@ def make_new_generation(pop_size, int_skip, nn_topology, fitnesses, sorted_contr
     """
 
     # start creating childrens by pairs (for only a quarter of the population)
+    # truncated "killing" selection
     children = []
     for i in range(0, pop_size, int_skip):
 
@@ -123,7 +124,7 @@ def make_new_generation(pop_size, int_skip, nn_topology, fitnesses, sorted_contr
         children.append(child)
 
     # replace the parents with the lowest score with the newly made children
-    # and update population
+    # and update population (this can also be changed)
     sorted_controls[0:len(children)] = children
 
     return sorted_controls
