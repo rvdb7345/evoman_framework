@@ -5,7 +5,7 @@ class test_controller(Controller):
     """
     Implements controller structure for player
     """
-    def __init__(self, nn_topology, lb=-1, ub=1):
+    def __init__(self, nn_topology, mutation_step_size=1, lb=-1, ub=1):
         """
         Initializes with a list of amount of neurons. Each index
         indicates the a hidden layer
@@ -14,6 +14,7 @@ class test_controller(Controller):
         self.n_layers = len(self.nn_topology)
         self.lower_bound = lb
         self.upper_bound = ub
+        self.mutation_step_size = mutation_step_size
 
         self.params_value = {}
         self.activations_funcs = {"sigmoid": self.sigmoid_activation}
