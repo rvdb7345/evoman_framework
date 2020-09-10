@@ -40,6 +40,9 @@ class test_controller(Controller):
             )
             self.params_value["activation" + str(idx)] = activation
 
+    def set_mutation_step_size(self, mut_size):
+        self.mutation_step_size = mut_size
+
     def create_network(self, params_value):
         """
         Creates/updates a neural network from a dictionary

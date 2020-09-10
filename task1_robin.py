@@ -37,7 +37,7 @@ def play_game(pcont, enemies, multiplemode):
 
     return env.play(pcont=pcont)
 
-def N_crossover_and_adaptive_mutation(parent1, parent2, prob1, prob2, nn_topology, mutation_chance, lb=-1, ub=1):
+def N_crossover_and_adaptive_mutation(parent1, parent2, prob1, prob2, nn_topology, mutation_chance, tau, lb=-1, ub=1):
     """
     Cross genes for each layer in hidden network according to a relative
     probability based on the fitnes of each parent
@@ -46,34 +46,45 @@ def N_crossover_and_adaptive_mutation(parent1, parent2, prob1, prob2, nn_topolog
     child_params, n_layers = {}, len(nn_topology)
     network1, network2 = parent1.get_params(), parent2.get_params()
 
-    # assert n_layers == len(network1) and n_layers == len(network2), "ERROR"
-
     for layer in range(n_layers):
-        print("This is the number of the layer: ", layer)
         str_layer = str(layer)
         W1, W2 = network1["W" + str_layer], network2["W" + str_layer]
         b1, b2 = network1["b" + str_layer], network2["b" + str_layer]
 
         activation_funcs = network1["activation" + str_layer], network2["activation" + str_layer]
 
-        child_params["W" + str_layer] = np.array([[W1[i][j] if np.random.random() < prob1 else W2[i][j] for i in range(len(W2))]
-                                         for j in range(len(W1[0]))]).T
-        child_params["b" + str_layer] = np.array([b1[i] if np.random.random() < prob1 else b2[i] for i in range(np.shape(b2)[0])])
-
+        child_params["W" + str_layer] = np.array([[W1[i][j] if np.random.random() < prob1 else W2[i][j]
+                                                   for i in range(len(W2))] for j in range(len(W1[0]))]).T
+        child_params["b" + str_layer] = np.array([b1[i] if np.random.random() < prob1 else b2[i]
+                                                  for i in range(np.shape(b2)[0])])
 
         # determine activation function by chance
         active_func = np.random.choice(activation_funcs, p=[prob1, prob2])
         child_params["activation" + str_layer] = active_func
 
-            # add noise (mutation)
+        if np.random.random() < 0.5:
+            mutation_step_size = parent1.mutation_step_size
+        else:
+            mutation_step_size = parent2.mutation_step_size
+
+        mutation_step_size -= mutation_step_size * tau
+
+        child_cont.set_mutation_step_size(mutation_step_size)
+
+        # add noise (mutation)
         for i in range(len(W2)):
             for j in range(len(W2[0])):
                 if np.random.uniform(0, 1) < mutation_chance:
-                    noise = np.random.normal(0, 1) # this can be changed (uniform distribution)
-                    child_params["W" + str_layer][i][j] += noise
+                    if np.random.random() < 0.5:
+                        child_params["W" + str_layer][i][j] += mutation_step_size
+                    else:
+                        child_params["W" + str_layer][i][j] -= mutation_step_size
 
         for i in range(np.shape(b2)[0]):
-                    child_params["b" + str_layer] += noise
+            if np.random.random() < 0.5:
+                child_params["b" + str_layer][i] += mutation_step_size
+            else:
+                child_params["b" + str_layer][i] -= mutation_step_size
 
         # adjust for limits weights
         weights_child = child_params["W" + str_layer]
@@ -101,7 +112,7 @@ def roulette_wheel_selection(fit_norm, pcontrols, id_prev=-1):
     return idx, pcontrols[len(pcontrols) - 1]
 
 
-def make_new_generation(pop_size, int_skip, nn_topology, fitnesses, sorted_controls, mutation_chance):
+def make_new_generation(pop_size, int_skip, nn_topology, fitnesses, sorted_controls, mutation_chance, tau):
     """
     Crossover gense for a given population
     """
@@ -117,7 +128,7 @@ def make_new_generation(pop_size, int_skip, nn_topology, fitnesses, sorted_contr
         prob2 = 1 - prob1
 
         # create child and add to children list
-        child = N_crossover_and_adaptive_mutation(parent1, parent2, prob1, prob2, nn_topology, mutation_chance)
+        child = N_crossover_and_adaptive_mutation(parent1, parent2, prob1, prob2, nn_topology, mutation_chance, tau)
         children.append(child)
 
     # replace the parents with the lowest score with the newly made children
@@ -138,6 +149,7 @@ if __name__ == "__main__":
     n_generations = 5
     mutation_chance = 0.2
     int_skip = 4
+    tau = 0.95
     # num_cores = cpu_count()
 
     # this if for one hidden layer neural network
@@ -218,7 +230,7 @@ if __name__ == "__main__":
 
         # make new generation
         pcontrols = make_new_generation(
-            population_size, int_skip, nn_topology, fit_norm, sorted_controls, mutation_chance
+            population_size, int_skip, nn_topology, fit_norm, sorted_controls, mutation_chance, tau
         )
         # pcontrols = make_new_generation(population_size, 2, nn_topology, fitnesses, pcontrols)
 
