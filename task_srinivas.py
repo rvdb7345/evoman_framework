@@ -20,7 +20,7 @@ import matplotlib.pyplot as plt
 from joblib import Parallel, delayed
 
 
-experiment_name = 'task_1'
+experiment_name = 'task_srinivas'
 if not os.path.exists(experiment_name):
     os.makedirs(experiment_name)
 
