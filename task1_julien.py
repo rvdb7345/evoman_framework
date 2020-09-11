@@ -39,24 +39,31 @@ def play_game(pcont, enemies, multiplemode):
 
 def crossover_and_mutation(parent1, parent2, prob1, prob2, nn_topology, mutation_chance, lb=-1, ub=1):
     """
-    Cross genes for each layer in hidden network according to a relative
-    probability based on the fitnes of each parent
+    Cross genes for each layer in hidden network by weighted linear combination.
+    The probability is for now drawn from a uniform distribution (see make_new_generation)
+
+    (according to a relative probability based on the fitnes of each parent??? --> 
+    less diversity, cause a greedy approach --> so maybe not necessary?)
     """
+
+    # setup variables for child controller and parametrs, nr of layer and
+    # parameters of parents
     child_cont = test_controller(nn_topology)
     child_params, n_layers = {}, len(nn_topology)
     network1, network2 = parent1.get_params(), parent2.get_params()
 
-    # assert n_layers == len(network1) and n_layers == len(network2), "ERROR"
-
+    # performs crossover per layer 
     for layer in range(n_layers):
         str_layer = str(layer)
+
+        # retrieve matrices parents and perform weighted linear combination
         W1, W2 = network1["W" + str_layer], network2["W" + str_layer]
         b1, b2 = network1["b" + str_layer], network2["b" + str_layer]
         activation_funcs = network1["activation" + str_layer], network2["activation" + str_layer]
         child_params["W" + str_layer] = prob1 * W1 + prob2 * W2
         child_params["b" + str_layer] = prob1 * b1 + prob2 * b2
 
-        # determine activation function by chance
+        # determine activation function by same probabilities
         active_func = np.random.choice(activation_funcs, p=[prob1, prob2])
         child_params["activation" + str_layer] = active_func
 
@@ -75,12 +82,16 @@ def crossover_and_mutation(parent1, parent2, prob1, prob2, nn_topology, mutation
         bias_child[bias_child < lb] = lb
 
     child_cont.create_network(child_params)
+
     return child_cont
 
 def roulette_wheel_selection(fit_norm, pcontrols, id_prev=-1):
     """
+    Selects parent controller by means of roulette wheel selection.
+    Note, that it asssumes that the fitness is normalized between 0 and 1.
     """
 
+    # checks !!!! THIS NEEDS TO BE CORRECTED 
     random_number = np.random.uniform(0, 1)
     for idx, norm in enumerate(fit_norm):
         if random_number < norm and not id_prev != idx:
@@ -100,22 +111,9 @@ def make_new_generation(pop_size, int_skip, nn_topology, fitnesses, sorted_contr
     children = []
     for i in range(0, pop_size, int_skip):
 
-        # # select parents and determine the relative probability of retrieving
-        # # the relative amount of genes from each one of the parents
-        # id1 = np.random.randint(0, pop_size)
-        # id2 = np.random.randint(0, pop_size)
-        # parent1, parent2 = pcontrols[id1], pcontrols[id2]
-
-        # prob1, prob2 = 1, 0
-        # if fitnesses[id1] != fitnesses[id2]:
-        #     fitness1 = np.abs(fitnesses[id1])
-        #     fitness2 = np.abs(fitnesses[id2])
-        #     prob1 = fitness1 / (fitness1 + fitness2)
-        #     prob2 = 1 - prob1
-
         # select parents with roullete wheel selection
         id1, parent1 = roulette_wheel_selection(fitnesses, sorted_controls)
-        id2, parent2 = roulette_wheel_selection(fitnesses, sorted_controls, id_prev=id1)
+        id2, parent2 = roulette_wheel_selection(fitnesses, sorted_controls)
         prob1 = np.random.uniform(0, 1)
         prob2 = 1 - prob1
 
@@ -129,6 +127,114 @@ def make_new_generation(pop_size, int_skip, nn_topology, fitnesses, sorted_contr
 
     return sorted_controls
 
+def run_one_parallel(
+    pcontrols, enemies, pop_size, best_fit, gen, 
+    not_improved, mean_fitness_gens, stds_fitness_gens
+    ):
+    """
+    Runs one parralel simulation in the Evoman framework
+    """
+
+    # create input including the number of neurons and the enemies so this isn't in the simulate function
+    pool_input = [(pcont, enemies, "no") for pcont in pcontrols]
+
+    # run the simulations in parallel
+    pool = Pool(cpu_count())
+    pool_list = pool.starmap(play_game, pool_input)
+    pool.close()
+    pool.join()
+
+    # get the fitnesses from the total results formatted as [(f, p, e, t), (...), ...]
+    fitnesses = [pool_list[i][0] for i in range(pop_size)]
+
+    best_fit_gen = max(fitnesses)
+    if best_fit_gen > best_fit:
+        best_fit = best_fit_gen
+        best_sol = pcontrols[fitnesses.index(best_fit)]
+        not_improved = 0
+    else:
+        not_improved += 1
+
+    mean_fitness_gens[gen] = np.mean(fitnesses)
+    stds_fitness_gens[gen] = np.std(fitnesses)
+
+    return fitnesses, best_fit
+
+def simulate_parallel(
+        nn_topology, pop_size, n_gens, 
+        lu=-1, ub=1, int_skip=4, 
+        mutation_prob=0.2, enemies=[8], multiplemode="no"
+    ):
+
+    # create player controls (random neural network) for the entire population
+    # pcontrols = [test_controller(nn_topology) for _ in range(population_size)]
+    pcontrols = []
+    for _ in range(pop_size):
+        pcont = test_controller(nn_topology)
+        pcont.initialize_random_network()
+        pcontrols.append(pcont)
+
+    # fitnesses = np.zeros(pop_size)
+    mean_fitness_gens = np.zeros(n_gens + 1)
+    stds_fitness_gens = np.zeros(n_gens + 1)
+    best_fit, best_sol, not_improved = 0, None, 0
+
+    # start evolutionary algorithm
+    for gen in tqdm(range(n_gens)):
+
+        fitnesses, best_fit = run_one_parallel(
+            pcontrols, enemies, pop_size, best_fit, gen, 
+            not_improved, mean_fitness_gens, stds_fitness_gens
+        )
+        print("Best fit is", best_fit)
+
+        # create a (proportional) cdf for the fitnesses
+        sorted_controls = [
+            parent for _, parent in sorted(
+                                        list(zip(fitnesses, pcontrols)),
+                                        key=lambda x: x[0]
+                                    )
+        ]
+        fitnesses.sort()
+
+        # CHECK FOR WHEN MIN AND MAX ARE EQUAL!!!!! --> Random Selection
+        best_fit_gen, worst_fit_gen = max(fitnesses), min(fitnesses)
+        fit_norm = [(fit - worst_fit_gen) / (best_fit_gen - worst_fit_gen) for fit in fitnesses]
+        print("Normalized fitness is", fit_norm)
+
+        print(
+            "Generation: {}, with an average fitness: {} and standard deviation: {}"
+            .format(gen, round(mean_fitness_gens[gen], 2), round(stds_fitness_gens[gen], 2))
+        )
+
+        # make new generation
+        pcontrols = make_new_generation(
+            pop_size, int_skip, nn_topology, fit_norm, sorted_controls, mutation_prob
+        )
+
+    # run final solution in parallel
+    fitnesses, best_fit = run_one_parallel(
+            pcontrols, enemies, pop_size, best_fit, n_gens, 
+            not_improved, mean_fitness_gens, stds_fitness_gens
+    )
+
+    print('Final population solution has an average fitness of: {}'.format(
+            round(mean_fitness_gens[n_gens], 2)
+        )
+    )
+    print("Best fit found: {}".format(best_fit))
+
+    # plot the results (mean and standard deviation) over the generations
+    plt.figure()
+    plt.title("Fitness per generation")
+    plt.errorbar(
+        np.arange(0, n_gens + 1), mean_fitness_gens, yerr=stds_fitness_gens
+    )
+    plt.grid()
+    plt.xlabel("Generation (#)")
+    plt.ylabel("Fitness")
+    plt.show()
+
 if __name__ == "__main__":
 
     # set the parameters
@@ -140,7 +246,6 @@ if __name__ == "__main__":
     n_generations = 5
     mutation_chance = 0.2
     int_skip = 4
-    # num_cores = cpu_count()
 
     # this if for one hidden layer neural network
     nn_topology = [
@@ -155,111 +260,15 @@ if __name__ == "__main__":
     #     {"input_dim": n_hidden_neurons, "output_dim": outputs, "activation": "sigmoid"}
     # ]
 
-    # create player controls (random neural network) for the entire population
-    # pcontrols = [test_controller(nn_topology) for _ in range(population_size)]
-    pcontrols = []
-    for _ in range(population_size):
-        pcont = test_controller(nn_topology)
-        pcont.initialize_random_network()
-        pcontrols.append(pcont)
-
-    # result = play_game(pcontrols[0], enemies, "no")
-    # print(result)
-
-    fitnesses = np.zeros(population_size)
-    mean_fitness_gens = np.zeros(n_generations + 1)
-    stds_fitness_gens = np.zeros(n_generations + 1)
-
-    best_fit, best_sol, not_improved = 0, None, 0
-
-    for gen in tqdm(range(n_generations)):
-
-        # create input including the number of neurons and the enemies so this isn't in the simulate function
-        pool_input = [(pcont, enemies, "no") for pcont in pcontrols]
-
-        # run the simulations in parallel
-        pool = Pool(cpu_count())
-        pool_list = pool.starmap(play_game, pool_input)
-        pool.close()
-        pool.join()
-
-        # get the fitnesses from the total results formatted as [(f, p, e, t), (...), ...]
-        fitnesses = [pool_list[i][0] for i in range(population_size)]
-
-        # create a (proportional) cdf for the fitnesses
-        sorted_controls = [
-        parent for _, parent in sorted(
-                                    list(zip(fitnesses, pcontrols)),
-                                    key=lambda x: x[0])
-        ]
-        fitnesses.sort()
-        best_fit_gen, worst_fit_gen = max(fitnesses), min(fitnesses)
-        fit_norm = [(fit - worst_fit_gen) / (best_fit_gen - worst_fit_gen) for fit in fitnesses]
-
-        print("Fitnesses Gen {} are {}".format(gen, fitnesses))
-
-        # # normalize fitness and determine probabilites based on fitness
-        # best_fit_gen, worst_fit_gen = max(fitnesses), min(fitnesses)
-        # fit_norm = [(fit - worst_fit_gen) / (best_fit_gen - worst_fit_gen) for fit in fitnesses]
-        # probs = fit_norm
-
-        best_fit_gen = max(fitnesses)
-        if best_fit_gen >= best_fit:
-            best_fit = best_fit_gen
-            best_sol = pcontrols[fitnesses.index(best_fit)]
-            not_improved = 0
-        else:
-            not_improved += 1
-
-        mean_fitness_gens[gen] = np.mean(fitnesses)
-        stds_fitness_gens[gen] = np.std(fitnesses)
-        print(
-            "Generation: {}, with an average fitness: {} and standard deviation: {}"
-            .format(gen, mean_fitness_gens[gen], stds_fitness_gens[gen])
-        )
-
-        # make new generation
-        pcontrols = make_new_generation(
-            population_size, int_skip, nn_topology, fit_norm, sorted_controls, mutation_chance
-        )
-        # pcontrols = make_new_generation(population_size, 2, nn_topology, fitnesses, pcontrols)
-
-    # run final solution in parallel
-    fitnesses = []
-    pool_input = [(pcont, enemies, "no") for pcont in pcontrols]
-    pool = Pool(cpu_count())
-    pool_list = pool.starmap(play_game, pool_input)
-    pool.close()
-    pool.join()
-
-    # get the fitnesses from the total results formatted as [(f, p, e, t), (...), ...]
-    fitnesses = [pool_list[i][0] for i in range(population_size)]
-
-    # check if it is a better solution, if so then update
-    best_fit_gen = max(fitnesses)
-    if best_fit_gen >= best_fit:
-        best_fit = best_fit_gen
-        best_sol = pcontrols[fitnesses.index(best_fit)]
-
-    # save final result
-    mean_fitness_gens[n_generations] = np.mean(fitnesses)
-    stds_fitness_gens[n_generations] = np.std(fitnesses)
-
-    print('Final population solution has an average fitness of: {}'.format(np.mean(fitnesses)))
-    print("Best fit found: {}".format(best_fit))
-
-    # plot the results (mean and standard deviation) over the generations
-    plt.figure()
-    plt.title("Fitness per generation")
-    plt.errorbar(
-        np.arange(0, n_generations + 1), mean_fitness_gens, yerr=stds_fitness_gens
+    simulate_parallel(
+        nn_topology, population_size, n_generations, 
+        lu=lower_bound, ub=upper_bound, int_skip=int_skip, 
+        mutation_prob=mutation_chance, enemies=enemies, multiplemode="no"
     )
-    plt.grid()
-    plt.xlabel("Generation (#)")
-    plt.ylabel("Fitness")
-    plt.show()
 
-    # # # initializes environment with ai player using random controller, playing against static enemy
+    # initializes environment with ai player using random controller, playing against static enemy
+    # pcont = test_controller(nn_topology)
+    # pcont.initialize_random_network()
     # env = Environment(
     #     experiment_name=experiment_name, playermode="ai",
     #     player_controller=pcont,
