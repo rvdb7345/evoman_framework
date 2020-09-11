@@ -53,10 +53,15 @@ def N_crossover_and_adaptive_mutation(parent1, parent2, prob1, prob2, nn_topolog
 
         activation_funcs = network1["activation" + str_layer], network2["activation" + str_layer]
 
+        # print("Prob 1:", prob1)
         child_params["W" + str_layer] = np.array([[W1[i][j] if np.random.random() < prob1 else W2[i][j]
                                                    for i in range(len(W2))] for j in range(len(W1[0]))]).T
         child_params["b" + str_layer] = np.array([b1[i] if np.random.random() < prob1 else b2[i]
                                                   for i in range(np.shape(b2)[0])])
+
+        # print("Child weights: ", child_params["W" + str_layer][0])
+        # print('parent 1 weights: ', W1[0])
+        # print('parent 2 weights: ', W2[0])
 
         # determine activation function by chance
         active_func = np.random.choice(activation_funcs, p=[prob1, prob2])
@@ -67,7 +72,7 @@ def N_crossover_and_adaptive_mutation(parent1, parent2, prob1, prob2, nn_topolog
         else:
             mutation_step_size = parent2.mutation_step_size
 
-        mutation_step_size -= mutation_step_size * tau
+        mutation_step_size = mutation_step_size * np.exp(tau * np.random.normal(0, 1))
 
         child_cont.set_mutation_step_size(mutation_step_size)
 
@@ -75,16 +80,11 @@ def N_crossover_and_adaptive_mutation(parent1, parent2, prob1, prob2, nn_topolog
         for i in range(len(W2)):
             for j in range(len(W2[0])):
                 if np.random.uniform(0, 1) < mutation_chance:
-                    if np.random.random() < 0.5:
-                        child_params["W" + str_layer][i][j] += mutation_step_size
-                    else:
-                        child_params["W" + str_layer][i][j] -= mutation_step_size
+                    child_params["W" + str_layer][i][j] += mutation_step_size
+
 
         for i in range(np.shape(b2)[0]):
-            if np.random.random() < 0.5:
-                child_params["b" + str_layer][i] += mutation_step_size
-            else:
-                child_params["b" + str_layer][i] -= mutation_step_size
+            child_params["b" + str_layer][i] += mutation_step_size
 
         # adjust for limits weights
         weights_child = child_params["W" + str_layer]
@@ -100,14 +100,22 @@ def N_crossover_and_adaptive_mutation(parent1, parent2, prob1, prob2, nn_topolog
 
 def roulette_wheel_selection(fit_norm, pcontrols, id_prev=-1):
     """
+    Selects parent controller by means of roulette wheel selection.
+    Note, that it asssumes that the fitness is normalized between 0 and 1.
+
+    ROULETTE WHEEL IS NOT THE BASED OPTION WHEN VALUES CAN BE NEGATIVE
+    --> possible solution is to firs rank the parents and determine the probability
+        on their ranking.
     """
 
-    random_number = np.random.uniform(0, 1)
+    # checks !!!! THIS NEEDS TO BE CORRECTED
+    random_number, prob = np.random.uniform(0.0, 1.0), 0.0
     for idx, norm in enumerate(fit_norm):
-        if random_number < norm and not id_prev != idx:
+        prob += norm
+        if random_number < prob and not id_prev != idx:
             return idx, pcontrols[idx]
-        elif random_number < norm and idx + 1 < len(pcontrols):
-            idx, pcontrols[idx + 1]
+        elif random_number < prob and idx + 1 < len(pcontrols):
+            return idx, pcontrols[idx + 1]
 
     return idx, pcontrols[len(pcontrols) - 1]
 
@@ -124,7 +132,7 @@ def make_new_generation(pop_size, int_skip, nn_topology, fitnesses, sorted_contr
         # select parents with roullete wheel selection
         id1, parent1 = roulette_wheel_selection(fitnesses, sorted_controls)
         id2, parent2 = roulette_wheel_selection(fitnesses, sorted_controls, id_prev=id1)
-        prob1 = np.random.uniform(0, 1)
+        prob1 = fitnesses[id1] / (fitnesses[id2] + fitnesses[id1])
         prob2 = 1 - prob1
 
         # create child and add to children list
@@ -145,9 +153,9 @@ if __name__ == "__main__":
     enemies = [8]
     lower_bound = -1
     upper_bound = 1
-    population_size = 4
-    n_generations = 5
-    mutation_chance = 0.2
+    population_size = 100
+    n_generations = 10
+    mutation_chance = 0.5
     int_skip = 4
     tau = 0.95
     # num_cores = cpu_count()

@@ -95,7 +95,7 @@ if __name__ == '__main__':
     # set the parameters
     lower_bound = -1
     upper_bound = 1
-    population_size = 6
+    population_size = 50
     n_generations = 5
     mutation_chance = 0.2
     num_cores = mp.cpu_count()
