@@ -85,6 +85,11 @@ def crossover_and_mutation(parent1, parent2, prob1, prob2, nn_topology, mutation
 
     return child_cont
 
+def roulette_rank_selection(fit_norm, sorted_controls):
+    """
+    """
+    return np.random.choice(sorted_controls, p=fit_norm)
+
 def roulette_wheel_selection(fit_norm, pcontrols, id_prev=-1):
     """
     Selects parent controller by means of roulette wheel selection.
@@ -96,12 +101,13 @@ def roulette_wheel_selection(fit_norm, pcontrols, id_prev=-1):
     """
 
     # checks !!!! THIS NEEDS TO BE CORRECTED 
-    random_number = np.random.uniform(0, 1)
+    random_number, prob = np.random.uniform(0.0, 1.0), 0.0
     for idx, norm in enumerate(fit_norm):
-        if random_number < norm and not id_prev != idx:
+        prob += norm
+        if random_number < prob and not id_prev != idx:
             return idx, pcontrols[idx]
-        elif random_number < norm and idx + 1 < len(pcontrols):
-            idx, pcontrols[idx + 1]
+        elif random_number < prob and idx + 1 < len(pcontrols):
+            return idx, pcontrols[idx + 1]
 
     return idx, pcontrols[len(pcontrols) - 1]
 
@@ -115,11 +121,17 @@ def make_new_generation(pop_size, int_skip, nn_topology, fitnesses, sorted_contr
     children = []
     for i in range(0, pop_size, int_skip):
 
-        # select parents with roullete wheel selection
-        id1, parent1 = roulette_wheel_selection(fitnesses, sorted_controls)
-        id2, parent2 = roulette_wheel_selection(fitnesses, sorted_controls)
+        ## RANK SELECTION
+        parent1 = roulette_rank_selection(fitnesses, sorted_controls)
+        parent2 = roulette_rank_selection(fitnesses, sorted_controls)
         prob1 = np.random.uniform(0, 1)
         prob2 = 1 - prob1
+
+        # # select parents with roullete wheel selection
+        # id1, parent1 = roulette_wheel_selection(fitnesses, sorted_controls)
+        # id2, parent2 = roulette_wheel_selection(fitnesses, sorted_controls)
+        # prob1 = np.random.uniform(0, 1)
+        # prob2 = 1 - prob1
 
         # create child and add to children list
         child = crossover_and_mutation(parent1, parent2, prob1, prob2, nn_topology, mutation_chance)
@@ -201,10 +213,19 @@ def simulate_parallel(
         ]
         fitnesses.sort()
 
-        # CHECK FOR WHEN MIN AND MAX ARE EQUAL!!!!! --> Random Selection
-        best_fit_gen, worst_fit_gen = max(fitnesses), min(fitnesses)
-        fit_norm = [(fit - worst_fit_gen) / (best_fit_gen - worst_fit_gen) for fit in fitnesses]
-        print("Normalized fitness is", fit_norm)
+        ## !!!!! THIS IS FOR RANK SELECTION
+        ranks = list(range(1, pop_size + 1, 1))
+        sum_ranks = sum(ranks)
+        fit_norm = [rank / sum_ranks for rank in ranks]
+
+        # # CHECK FOR WHEN MIN AND MAX ARE EQUAL!!!!! --> Random Selection (or see note roulette wheel)
+        # best_fit_gen, worst_fit_gen = max(fitnesses), min(fitnesses)
+        # fit_norm = []
+        # if best_fit_gen  != worst_fit_gen:
+        #     fit_norm = [(fit - worst_fit_gen) / (best_fit_gen - worst_fit_gen) for fit in fitnesses]
+        # else:
+        #     fit_norm = [1 / pop_size] * pop_size
+        # # print("Normalized fitness is", fit_norm)
 
         print(
             "Generation: {}, with an average fitness: {} and standard deviation: {}"
