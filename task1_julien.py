@@ -89,6 +89,10 @@ def roulette_wheel_selection(fit_norm, pcontrols, id_prev=-1):
     """
     Selects parent controller by means of roulette wheel selection.
     Note, that it asssumes that the fitness is normalized between 0 and 1.
+
+    ROULETTE WHEEL IS NOT THE BASED OPTION WHEN VALUES CAN BE NEGATIVE
+    --> possible solution is to firs rank the parents and determine the probability
+        on their ranking.
     """
 
     # checks !!!! THIS NEEDS TO BE CORRECTED 
