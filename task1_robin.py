@@ -11,9 +11,14 @@ sys.path.insert(0, "evoman")
 from multiprocessing import Pool, cpu_count
 from tqdm import tqdm
 import numpy as np
+import pandas as pd
+import pickle
+from datetime import datetime
 import matplotlib.pyplot as plt
 from environment import Environment
 from controller_julien import test_controller
+
+dir_path = os.path.abspath('')
 
 experiment_name = "task1_julien"
 if not os.path.exists(experiment_name):
@@ -58,10 +63,6 @@ def N_crossover_and_adaptive_mutation(parent1, parent2, prob1, prob2, nn_topolog
                                                    for i in range(len(W2))] for j in range(len(W1[0]))]).T
         child_params["b" + str_layer] = np.array([b1[i] if np.random.random() < prob1 else b2[i]
                                                   for i in range(np.shape(b2)[0])])
-
-        # print("Child weights: ", child_params["W" + str_layer][0])
-        # print('parent 1 weights: ', W1[0])
-        # print('parent 2 weights: ', W2[0])
 
         # determine activation function by chance
         active_func = np.random.choice(activation_funcs, p=[prob1, prob2])
@@ -145,6 +146,210 @@ def make_new_generation(pop_size, int_skip, nn_topology, fitnesses, sorted_contr
 
     return sorted_controls
 
+def run_one_parallel(
+    pcontrols, enemies, pop_size, best_fit, gen,
+    not_improved, mean_fitness_gens, stds_fitness_gens,
+        mean_p_lifes_gens, stds_p_lifes_gens,
+        mean_e_lifes_gens, stds_e_lifes_gens,
+        best_sol
+    ):
+    """
+    Runs one parralel simulation in the Evoman framework
+    """
+
+    # create input including the number of neurons and the enemies so this isn't in the simulate function
+    pool_input = [(pcont, enemies, "no") for pcont in pcontrols]
+
+    # run the simulations in parallel
+    pool = Pool(cpu_count())
+    pool_list = pool.starmap(play_game, pool_input)
+    pool.close()
+    pool.join()
+
+    # get the fitnesses from the total results formatted as [(f, p, e, t), (...), ...]
+    fitnesses = [pool_list[i][0] for i in range(pop_size)]
+    player_lifes = [pool_list[i][1] for i in range(population_size)]
+    enemies_lifes = [pool_list[i][2] for i in range(population_size)]
+
+    best_fit_gen = max(fitnesses)
+    if best_fit_gen > best_fit:
+        best_fit = best_fit_gen
+        best_sol = pcontrols[fitnesses.index(best_fit)]
+        not_improved = 0
+    else:
+        not_improved += 1
+
+    mean_fitness_gens[gen] = np.mean(fitnesses)
+    stds_fitness_gens[gen] = np.std(fitnesses)
+
+    mean_p_lifes_gens[gen] = np.mean(player_lifes)
+    stds_p_lifes_gens[gen] = np.std(player_lifes)
+
+    mean_e_lifes_gens[gen] = np.mean(enemies_lifes)
+    stds_e_lifes_gens[gen] = np.std(enemies_lifes)
+
+    return fitnesses, best_fit, player_lifes, enemies, best_sol
+
+
+def save_generations(generation_sum_df):
+    if os.path.exists(os.path.join(dir_path, 'generational_summary')):
+        with open(os.path.join(dir_path, 'generational_summary'), 'rb') as config_df_file:
+            config_df = pickle.load(config_df_file)
+            generation_sum_df = pd.concat([generation_sum_df, config_df])
+
+    with open('generational_summary', 'wb') as config_dictionary_file:
+        pickle.dump(generation_sum_df, config_dictionary_file)
+
+
+def save_best_solution(enemies, best_fit, sol):
+    best_solution_df = pd.DataFrame({'enemies': enemies, 'fitness': best_fit, 'best_solution': sol})
+
+    if os.path.exists(os.path.join(dir_path, 'best_results')):
+        with open(os.path.join(dir_path, 'best_results'), 'rb') as config_df_file:
+            config_df = pickle.load(config_df_file)
+            best_solution_df = pd.concat([best_solution_df, config_df])
+
+    with open('best_results', 'wb') as config_dictionary_file:
+        pickle.dump(best_solution_df, config_dictionary_file)
+
+
+
+def simulate_parallel(
+        nn_topology, pop_size, n_gens,
+        lu=-1, ub=1, int_skip=4,
+        mutation_prob=0.2, enemies=[8], multiplemode="no"
+    ):
+
+    # create player controls (random neural network) for the entire population
+    # pcontrols = [test_controller(nn_topology) for _ in range(population_size)]
+
+    tau = 1 / pop_size ** 2
+
+    pcontrols = []
+    for _ in range(pop_size):
+        pcont = test_controller(nn_topology)
+        pcont.initialize_random_network()
+        pcontrols.append(pcont)
+
+    # fitnesses = np.zeros(pop_size)
+    mean_fitness_gens = np.zeros(n_gens + 1)
+    stds_fitness_gens = np.zeros(n_gens + 1)
+
+    mean_p_lifes_gens = np.zeros(n_generations + 1)
+    stds_p_lifes_gens = np.zeros(n_generations + 1)
+
+    mean_e_lifes_gens = np.zeros(n_generations + 1)
+    stds_e_lifes_gens = np.zeros(n_generations + 1)
+
+    best_fit, best_sol, not_improved = 0, None, 0
+
+    now = datetime.now()
+    dt_string = now.strftime("%d/%m/%Y %H:%M:%S")
+
+    generation_sum_df = pd.DataFrame(columns=['datetime', 'gen', 'enemies', 'fit_max', 'fit_mean'])
+
+    # start evolutionary algorithm
+    for gen in tqdm(range(n_gens)):
+
+        fitnesses, best_fit, player_lifes, enemies_lifes, best_sol = run_one_parallel(
+            pcontrols, enemies, pop_size, best_fit, gen,
+            not_improved, mean_fitness_gens, stds_fitness_gens,
+            mean_p_lifes_gens, stds_p_lifes_gens, mean_e_lifes_gens, stds_e_lifes_gens,
+            best_sol
+        )
+        print("Best fit is", best_fit)
+
+        # create a (proportional) cdf for the fitnesses
+        sorted_controls = [
+            parent for _, parent in sorted(
+                                        list(zip(fitnesses, pcontrols)),
+                                        key=lambda x: x[0]
+                                    )
+        ]
+        fitnesses.sort()
+
+        ## !!!!! THIS IS FOR RANK SELECTION
+        ranks = list(range(1, pop_size + 1, 1))
+        sum_ranks = sum(ranks)
+        fit_norm = [rank / sum_ranks for rank in ranks]
+
+        # # CHECK FOR WHEN MIN AND MAX ARE EQUAL!!!!! --> Random Selection (or see note roulette wheel)
+        # best_fit_gen, worst_fit_gen = max(fitnesses), min(fitnesses)
+        # fit_norm = []
+        # if best_fit_gen  != worst_fit_gen:
+        #     fit_norm = [(fit - worst_fit_gen) / (best_fit_gen - worst_fit_gen) for fit in fitnesses]
+        # else:
+        #     fit_norm = [1 / pop_size] * pop_size
+        # # print("Normalized fitness is", fit_norm)
+
+        print(
+            "Generation: {}, with an average fitness: {} and standard deviation: {}"
+            .format(gen, round(mean_fitness_gens[gen], 2), round(stds_fitness_gens[gen], 2))
+        )
+
+        generation_sum_df = generation_sum_df.append({'datetime': dt_string, 'gen': gen, 'enemies': enemies[0], 'fit_max': max(fitnesses),
+                                      'fit_mean': mean_fitness_gens[gen]}, ignore_index=True)
+
+        # make new generation
+        pcontrols = make_new_generation(
+            population_size, int_skip, nn_topology, fit_norm, sorted_controls, mutation_prob, tau
+        )
+
+    # run final solution in parallel
+    fitnesses, best_fit, player_lifes, enemies_lifes, best_sol = run_one_parallel(
+            pcontrols, enemies, pop_size, best_fit, n_gens,
+            not_improved, mean_fitness_gens, stds_fitness_gens,
+            mean_p_lifes_gens, stds_p_lifes_gens, mean_e_lifes_gens, stds_e_lifes_gens,
+            best_sol
+    )
+
+    print(generation_sum_df)
+
+    # save best solution
+    save_best_solution(enemies, best_fit, best_sol)
+
+    # save the mean and the max fitness during each run
+    save_generations(generation_sum_df)
+
+    print('Final population solution has an average fitness of: {}'.format(
+            round(mean_fitness_gens[n_gens], 2)
+        )
+    )
+    print("Best fit found: {}".format(best_fit))
+
+    # plot the results (mean and standard deviation) over the generations
+    plt.figure()
+    plt.title("Fitness per generation")
+    plt.errorbar(
+        np.arange(0, n_gens + 1), mean_fitness_gens, yerr=stds_fitness_gens
+    )
+    plt.grid()
+    plt.xlabel("Generation (#)")
+    plt.ylabel("Fitness")
+    plt.show()
+
+    # plot the results (mean and standard deviation) over the generations
+    plt.figure()
+    plt.title("Player lifes per generation")
+    plt.errorbar(
+        np.arange(0, n_generations + 1), mean_p_lifes_gens, yerr=stds_p_lifes_gens
+    )
+    plt.grid()
+    plt.xlabel("Generation (#)")
+    plt.ylabel("Life")
+    plt.show()
+
+    # plot the results (mean and standard deviation) over the generations
+    plt.figure()
+    plt.title("Enemy lifes per generation")
+    plt.errorbar(
+        np.arange(0, n_generations + 1), mean_e_lifes_gens, yerr=stds_e_lifes_gens
+    )
+    plt.grid()
+    plt.xlabel("Generation (#)")
+    plt.ylabel("Life")
+    plt.show()
+
 
 if __name__ == "__main__":
 
@@ -154,10 +359,12 @@ if __name__ == "__main__":
     lower_bound = -1
     upper_bound = 1
     population_size = 100
-    n_generations = 10
-    mutation_chance = 0.5
+    n_generations = 25
+    mutation_chance = 0.2
     int_skip = 4
-    tau = 0.95
+    tau = 1 / population_size**2
+
+    repeats = 8
     # num_cores = cpu_count()
 
     # this if for one hidden layer neural network
@@ -183,99 +390,12 @@ if __name__ == "__main__":
 
     # result = play_game(pcontrols[0], enemies, "no")
     # print(result)
-
-    fitnesses = np.zeros(population_size)
-    mean_fitness_gens = np.zeros(n_generations + 1)
-    stds_fitness_gens = np.zeros(n_generations + 1)
-
-    best_fit, best_sol, not_improved = 0, None, 0
-
-    for gen in tqdm(range(n_generations)):
-
-        # create input including the number of neurons and the enemies so this isn't in the simulate function
-        pool_input = [(pcont, enemies, "no") for pcont in pcontrols]
-
-        # run the simulations in parallel
-        pool = Pool(cpu_count())
-        pool_list = pool.starmap(play_game, pool_input)
-        pool.close()
-        pool.join()
-
-        # get the fitnesses from the total results formatted as [(f, p, e, t), (...), ...]
-        fitnesses = [pool_list[i][0] for i in range(population_size)]
-
-        # create a (proportional) cdf for the fitnesses
-        sorted_controls = [
-        parent for _, parent in sorted(
-                                    list(zip(fitnesses, pcontrols)),
-                                    key=lambda x: x[0])
-        ]
-        fitnesses.sort()
-        best_fit_gen, worst_fit_gen = max(fitnesses), min(fitnesses)
-        fit_norm = [(fit - worst_fit_gen) / (best_fit_gen - worst_fit_gen) for fit in fitnesses]
-
-        print("Fitnesses Gen {} are {}".format(gen, fitnesses))
-
-        # # normalize fitness and determine probabilites based on fitness
-        # best_fit_gen, worst_fit_gen = max(fitnesses), min(fitnesses)
-        # fit_norm = [(fit - worst_fit_gen) / (best_fit_gen - worst_fit_gen) for fit in fitnesses]
-        # probs = fit_norm
-
-        best_fit_gen = max(fitnesses)
-        if best_fit_gen >= best_fit:
-            best_fit = best_fit_gen
-            best_sol = pcontrols[fitnesses.index(best_fit)]
-            not_improved = 0
-        else:
-            not_improved += 1
-
-        mean_fitness_gens[gen] = np.mean(fitnesses)
-        stds_fitness_gens[gen] = np.std(fitnesses)
-        print(
-            "Generation: {}, with an average fitness: {} and standard deviation: {}"
-            .format(gen, mean_fitness_gens[gen], stds_fitness_gens[gen])
+    for i in range(repeats):
+        simulate_parallel(
+            nn_topology, population_size, n_generations,
+            lu=lower_bound, ub=upper_bound, int_skip=int_skip,
+            mutation_prob=mutation_chance, enemies=enemies, multiplemode="no"
         )
-
-        # make new generation
-        pcontrols = make_new_generation(
-            population_size, int_skip, nn_topology, fit_norm, sorted_controls, mutation_chance, tau
-        )
-        # pcontrols = make_new_generation(population_size, 2, nn_topology, fitnesses, pcontrols)
-
-    # run final solution in parallel
-    fitnesses = []
-    pool_input = [(pcont, enemies, "no") for pcont in pcontrols]
-    pool = Pool(cpu_count())
-    pool_list = pool.starmap(play_game, pool_input)
-    pool.close()
-    pool.join()
-
-    # get the fitnesses from the total results formatted as [(f, p, e, t), (...), ...]
-    fitnesses = [pool_list[i][0] for i in range(population_size)]
-
-    # check if it is a better solution, if so then update
-    best_fit_gen = max(fitnesses)
-    if best_fit_gen >= best_fit:
-        best_fit = best_fit_gen
-        best_sol = pcontrols[fitnesses.index(best_fit)]
-
-    # save final result
-    mean_fitness_gens[n_generations] = np.mean(fitnesses)
-    stds_fitness_gens[n_generations] = np.std(fitnesses)
-
-    print('Final population solution has an average fitness of: {}'.format(np.mean(fitnesses)))
-    print("Best fit found: {}".format(best_fit))
-
-    # plot the results (mean and standard deviation) over the generations
-    plt.figure()
-    plt.title("Fitness per generation")
-    plt.errorbar(
-        np.arange(0, n_generations + 1), mean_fitness_gens, yerr=stds_fitness_gens
-    )
-    plt.grid()
-    plt.xlabel("Generation (#)")
-    plt.ylabel("Fitness")
-    plt.show()
 
     # # # initializes environment with ai player using random controller, playing against static enemy
     # env = Environment(
