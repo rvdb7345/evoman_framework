@@ -41,15 +41,15 @@ for i, gen in enemy_specific_develop.groupby(by='gen'):
 
 plt.figure()
 plt.title('Fitness over generations, enemy: {}'.format(enemies))
-plt.plot(mean_mean_per_generation, label='Mean fitness', colour='blue')
-plt.fill_between(np.arange(0, len(mean_mean_per_generation)),
-                 np.array(mean_mean_per_generation) - np.array(mean_std_per_generation),
-                 np.array(mean_mean_per_generation)+np.array(mean_std_per_generation), alpha=0.5,
+plt.plot(mean_mean_per_generation[:25], label='Mean fitness', color='blue')
+plt.fill_between(np.arange(0, len(mean_mean_per_generation[:25])),
+                 np.array(mean_mean_per_generation[:25]) - np.array(mean_std_per_generation[:25]),
+                 np.array(mean_mean_per_generation[:25])+np.array(mean_std_per_generation[:25]), alpha=0.5,
                  facecolor='blue')
-plt.plot(mean_max_per_generation, label='Max fitness', color='red')
-plt.fill_between(np.arange(0, len(mean_max_per_generation)),
-                 np.array(mean_max_per_generation) - np.array(std_max_per_generation),
-                 np.array(mean_max_per_generation) + np.array(std_max_per_generation), alpha=0.5,
+plt.plot(mean_max_per_generation[:25], label='Max fitness', color='red')
+plt.fill_between(np.arange(0, len(mean_max_per_generation[:25])),
+                 np.array(mean_max_per_generation[:25]) - np.array(std_max_per_generation[:25]),
+                 np.array(mean_max_per_generation[:25]) + np.array(std_max_per_generation[:25]), alpha=0.5,
                  facecolor='red')
 plt.grid()
 plt.legend(fontsize=18)
