@@ -1,0 +1,9 @@
+# Ignore all .vscode folder
+**/.vscode/
+
+# Ignore pycache folders and .pyc files
+**/__pycache__/
+*.pyc
+
+# Ignore DSstore
+**/.DS_Store
