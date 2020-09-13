@@ -31,7 +31,8 @@ env = Environment(experiment_name=experiment_name,
                   player_controller=player_controller(n_hidden_neurons),
                   enemymode="static",
                   level=2,
-                  speed="fastest")
+                  speed="fastest",
+                  logs="off")
 
 # default environment fitness is assumed for experiment
 
@@ -52,7 +53,7 @@ n_vars = (env.get_num_sensors()+1)*n_hidden_neurons + (n_hidden_neurons+1)*5
 
 dom_u = 1
 dom_l = -1
-npop = 100
+npop = 10
 gens = 30
 mutation = 0.2
 last_best = 0
@@ -255,7 +256,7 @@ for i in range(ini_g+1, gens):
     std  =  np.std(fit_pop)
     mean = np.mean(fit_pop)
 
-
+    print(fit_pop)
     # saves results
     file_aux  = open(experiment_name+'/results.txt','a')
     print( '\n GENERATION '+str(i)+' '+str(round(fit_pop[best],6))+' '+str(round(mean,6))+' '+str(round(std,6)))
