@@ -147,13 +147,12 @@ class SimulationRank(object):
             pickle.dump(generation_sum_df, config_dictionary_file)
 
     def save_best_solution(self, enemies, best_fit, sol):
-        # Hier is op dit moment een error ???
-        best_solution_df = pd.DataFrame({'enemies': enemies, 'fitness': best_fit, 'best_solution': sol})
+        best_solution_df = pd.DataFrame({'enemies': enemies, 'fitness': best_fit, 'best_solution': sol}, index=[0])
 
         if os.path.exists(os.path.join(self.dir_path, 'best_results')):
             with open(os.path.join(self.dir_path, 'best_results'), 'rb') as config_df_file:
                 config_df = pickle.load(config_df_file)
-                best_solution_df = pd.concat([best_solution_df, config_df])
+                best_solution_df = pd.concat([best_solution_df, config_df], ignore_index=True)
 
         with open('best_results', 'wb') as config_dictionary_file:
             pickle.dump(best_solution_df, config_dictionary_file)
