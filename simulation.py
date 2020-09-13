@@ -16,6 +16,9 @@ sys.path.insert(0, "evoman")
 from multiprocessing import Pool, cpu_count
 from tqdm  import tqdm
 import numpy as np
+import pickle
+import pandas as pd
+from datetime import datetime
 import matplotlib.pyplot as plt
 from environment import Environment
 from controller_julien import test_controller
@@ -41,7 +44,7 @@ class SimulationRank(object):
                 mutation_chance=0.2, 
                 nr_skip_parents=4, 
                 enemies=[8], 
-                multiplemode = "no"
+                multiplemode = "no",
         ):
         """
         Initialize simulation object
@@ -68,25 +71,38 @@ class SimulationRank(object):
 
         self.mutation_chance = mutation_chance
         self.nr_skip_parents = nr_skip_parents
+        self.tau = 1 / self.pop_size ** 2
 
         if len(enemies) > 1 and multiplemode == "no" or len(enemies) == 1 and multiplemode == "yes":
             raise AssertionError("Enemies settings are not valid!")
 
         self.enemies = enemies
         self.multiplemode = "no"
+        self.dir_path = os.path.abspath('')
+
+        self.controller_index = 0
 
         # initialize random AI players for given pop size
         self.pcontrols = []
-        for _ in range(pop_size):
+        for i in range(pop_size):
             pcont = test_controller(
-                self.nn_topology, lb=self.lower_bound, ub=self.upper_bound
+                self.controller_index, self.nn_topology, lb=self.lower_bound, ub=self.upper_bound
             )
             pcont.initialize_random_network()
             self.pcontrols.append(pcont)
 
+            self.controller_index += 1
+
         # initialize tracking variables for statistics of simulation
         self.mean_fitness_gens = np.zeros(nr_gens + 1)
         self.stds_fitness_gens = np.zeros(nr_gens + 1)
+        self.mean_p_lifes_gens = np.zeros(nr_gens + 1)
+        self.stds_p_lifes_gens = np.zeros(nr_gens + 1)
+
+        self.mean_e_lifes_gens = np.zeros(nr_gens + 1)
+        self.stds_e_lifes_gens = np.zeros(nr_gens + 1)
+
+
         self.best_fit, self.best_sol, self.not_improved = 0, None, 0
         
     def make_NN_topology(
@@ -122,6 +138,26 @@ class SimulationRank(object):
 
             self.nn_topology.append(layer_topology)
 
+    def save_generations(self, generation_sum_df):
+        if os.path.exists(os.path.join(self.dir_path, 'generational_summary')):
+            with open(os.path.join(self.dir_path, 'generational_summary'), 'rb') as config_df_file:
+                config_df = pickle.load(config_df_file)
+                generation_sum_df = pd.concat([generation_sum_df, config_df])
+
+        with open('generational_summary', 'wb') as config_dictionary_file:
+            pickle.dump(generation_sum_df, config_dictionary_file)
+
+    def save_best_solution(self, enemies, best_fit, sol):
+        best_solution_df = pd.DataFrame({'enemies': enemies, 'fitness': best_fit, 'best_solution': sol})
+
+        if os.path.exists(os.path.join(self.dir_path, 'best_results')):
+            with open(os.path.join(self.dir_path, 'best_results'), 'rb') as config_df_file:
+                config_df = pickle.load(config_df_file)
+                best_solution_df = pd.concat([best_solution_df, config_df])
+
+        with open('best_results', 'wb') as config_dictionary_file:
+            pickle.dump(best_solution_df, config_dictionary_file)
+
     def play_game(self, pcont):
         """
         Helper function to simulate a game in the Evoman framework
@@ -140,7 +176,28 @@ class SimulationRank(object):
 
         return env.play(pcont=pcont)
 
-    def crossover_and_mutation(self, parent1, parent2):
+    def mutation(self, child_params, str_layer, child_cont, parent1, parent2, W2, b2):
+        # add noise (mutation)
+        if np.random.uniform(0, 1) < self.mutation_chance:
+            noise = np.random.normal(0, 1)
+            child_params["W" + str_layer] += noise
+            child_params["b" + str_layer] += noise
+
+        return child_params
+
+    def crossover(self, child_params, prob1, prob2, W1, W2, b1, b2, str_layer):
+        child_params["W" + str_layer] = prob1 * W1 + prob2 * W2
+        child_params["b" + str_layer] = prob1 * b1 + prob2 * b2
+
+        return child_params
+
+    def crossover_division(self):
+        prob1 = np.random.uniform(0, 1)
+        prob2 = 1 - prob1
+
+        return prob1, prob2
+
+    def crossover_and_mutation(self, parent1, parent2, id1, id2, fitnesses):
         """
         Cross genes for each layer in hidden network by weighted linear combination.
         The probability is for now drawn from a uniform distribution (see make_new_generation)
@@ -151,7 +208,8 @@ class SimulationRank(object):
 
         # setup variables for child controller and parametrs, nr of layer and
         # parameters of parents
-        child_cont, child_params = test_controller(self.nn_topology),  {}
+        child_cont, child_params = test_controller(self.controller_index, self.nn_topology),  {}
+        self.controller_index += 1
         network1, network2 = parent1.get_params(), parent2.get_params()
 
         # performs crossover per layer 
@@ -164,20 +222,15 @@ class SimulationRank(object):
             activation_funcs = network1["activation" + str_layer], network2["activation" + str_layer]
 
             # determine (uniform) probability of genes inherited by parents
-            prob1 = np.random.uniform(0, 1)
-            prob2 = 1 - prob1
-            child_params["W" + str_layer] = prob1 * W1 + prob2 * W2
-            child_params["b" + str_layer] = prob1 * b1 + prob2 * b2
+            prob1, prob2 = self.crossover_division(fitnesses, id1, id2)
+
+            child_params = self.crossover(child_params, prob1, prob2, W1, W2, b1, b2, str_layer)
 
             # determine activation function by same probabilities
             active_func = np.random.choice(activation_funcs, p=[prob1, prob2])
             child_params["activation" + str_layer] = active_func
 
-            # add noise (mutation)
-            if np.random.uniform(0, 1) < self.mutation_chance:
-                noise = np.random.normal(0, 1)
-                child_params["W" + str_layer] += noise
-                child_params["b" + str_layer] += noise
+            child_params = self.mutation(child_params, str_layer, child_cont, parent1, parent2, W2, b2)
 
             # adjust for limits weights
             weights_child = child_params["W" + str_layer]
@@ -218,7 +271,7 @@ class SimulationRank(object):
             id2, parent2 = self.parent_selection(fit_norm_sorted, sorted_controls, id_prev=-1)
 
             # create child and add to children list
-            child = self.crossover_and_mutation(parent1, parent2)
+            child = self.crossover_and_mutation(parent1, parent2, id1, id2, fit_norm_sorted)
             children.append(child)
 
         # select parents based on normilzed probabilites of the fitnesses who
@@ -227,7 +280,7 @@ class SimulationRank(object):
         # reversed_norm = [1 - fit for fit in fit_norm_sorted]
         not_survived_contr = np.random.choice(sorted_controls, size=len(children), p=reversed_norm)
         for i, pcont in enumerate(not_survived_contr):
-            idx = sorted_controls.index(pcont)
+            idx = sorted_controls.index(pcont.id_nn)
             sorted_controls[idx] = children[i]
 
         # # replace the parents with the lowest score with the newly made children
@@ -249,6 +302,8 @@ class SimulationRank(object):
 
         # get the fitnesses from the total results formatted as [(f, p, e, t), (...), ...]
         fitnesses = [pool_list[i][0] for i in range(self.pop_size)]
+        player_lifes = [pool_list[i][1] for i in range(self.pop_size)]
+        enemies_lifes = [pool_list[i][2] for i in range(self.pop_size)]
 
         best_fit_gen = max(fitnesses)
         if best_fit_gen > self.best_fit:
@@ -261,7 +316,13 @@ class SimulationRank(object):
         self.mean_fitness_gens[gen] = np.mean(fitnesses)
         self.stds_fitness_gens[gen] = np.std(fitnesses)
 
-        return fitnesses
+        self.mean_p_lifes_gens[gen] = np.mean(player_lifes)
+        self.stds_p_lifes_gens[gen] = np.std(player_lifes)
+
+        self.mean_e_lifes_gens[gen] = np.mean(enemies_lifes)
+        self.stds_e_lifes_gens[gen] = np.std(enemies_lifes)
+
+        return fitnesses, player_lifes
 
     def run_evolutionary_algo(self):
         """
@@ -273,10 +334,15 @@ class SimulationRank(object):
         sum_ranks = sum(ranks)
         fit_norm = [rank / sum_ranks for rank in ranks]
 
+        now = datetime.now()
+        dt_string = now.strftime("%d/%m/%Y %H:%M:%S")
+
+        generation_sum_df = pd.DataFrame(columns=['datetime', 'gen', 'enemies', 'fit_max', 'fit_mean'])
+
         # start evolutionary algorithm
         for gen in tqdm(range(self.nr_gens)):
 
-            fitnesses = self.run_parallel(gen)
+            fitnesses, player_lifes = self.run_parallel(gen)
 
             # create a (proportional) cdf for the fitnesses
             sorted_controls = [
@@ -286,11 +352,21 @@ class SimulationRank(object):
             ]
             fitnesses.sort()
 
+            generation_sum_df = generation_sum_df.append(
+                {'datetime': dt_string, 'gen': gen, 'enemies': self.enemies[0], 'fit_max': max(fitnesses),
+                 'fit_mean': self.mean_fitness_gens[gen]}, ignore_index=True)
+
             # make new generation
             self.pcontrols = self.make_new_generation(fit_norm, sorted_controls)
 
         # run final solution in parallel
-        fitnesses = self.run_parallel(self.nr_gens)
+        fitnesses, player_lifes = self.run_parallel(self.nr_gens)
+
+        # save the best solution of the entire run
+        self.save_best_solution(self.enemies[0], self.best_fit, self.best_sol)
+
+        # save the mean and the max fitness during each run
+        self.save_generations(generation_sum_df)
 
         # plot the results (mean and standard deviation) over the generations
         self.simple_errorbar()
@@ -361,3 +437,59 @@ class SimulationRoulette(SimulationRank):
 
         # plot the results (mean and standard deviation) over the generations
         self.simple_errorbar()
+
+
+class SimulationAdaptiveMutationNpointCrossover(SimulationRank):
+    def __init__(
+            self, experiment_name, nr_inputs, nr_layers,
+            nr_neurons, nr_outputs, activation_func, activation_distr,
+            lower_bound, upper_bound, pop_size, nr_gens,
+            mutation_chance, nr_skip_parents, enemies,  multiplemode
+        ):
+        super().__init__(
+            experiment_name, nr_inputs, nr_layers, nr_neurons,
+            nr_outputs, activation_func, activation_distr,
+            lower_bound, upper_bound, pop_size, nr_gens,
+            mutation_chance, nr_skip_parents, enemies,  multiplemode
+        )
+
+    def mutation(self, child_params, str_layer, child_cont, parent1, parent2, W2, b2):
+        # add noise (mutation)
+        if np.random.random() < 0.5:
+            mutation_step_size = parent1.mutation_step_size
+        else:
+            mutation_step_size = parent2.mutation_step_size
+
+        mutation_step_size = mutation_step_size * np.exp(self.tau * np.random.normal(0, 1))
+
+        child_cont.set_mutation_step_size(mutation_step_size)
+
+        # add noise (mutation)
+        for i in range(len(W2)):
+            for j in range(len(W2[0])):
+                if np.random.uniform(0, 1) < self.mutation_chance:
+                    child_params["W" + str_layer][i][j] += mutation_step_size
+
+
+        for i in range(np.shape(b2)[0]):
+            if np.random.uniform(0, 1) < self.mutation_chance:
+                child_params["b" + str_layer][i] += mutation_step_size
+
+        return child_params
+
+    def crossover(self, child_params, prob1, prob2, W1, W2, b1, b2, str_layer):
+        child_params["W" + str_layer] = np.array([[W1[i][j] if np.random.random() < prob1 else W2[i][j]
+                                                   for i in range(len(W2))] for j in range(len(W1[0]))]).T
+        child_params["b" + str_layer] = np.array([b1[i] if np.random.random() < prob1 else b2[i]
+                                                  for i in range(np.shape(b2)[0])])
+
+
+        return child_params
+
+    def crossover_division(self, fitnesses, id1, id2):
+        cancel_negativity = 1
+        prob1 = (fitnesses[id1] + cancel_negativity) / ((fitnesses[id2] + cancel_negativity) +
+                                                        (fitnesses[id1] + cancel_negativity))
+        prob2 = 1 - prob1
+
+        return prob1, prob2

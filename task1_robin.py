@@ -86,7 +86,8 @@ def N_crossover_and_adaptive_mutation(parent1, parent2, prob1, prob2, nn_topolog
 
 
         for i in range(np.shape(b2)[0]):
-            child_params["b" + str_layer][i] += mutation_step_size
+            if np.random.uniform(0, 1) < mutation_chance:
+                child_params["b" + str_layer][i] += mutation_step_size
 
         # adjust for limits weights
         weights_child = child_params["W" + str_layer]
