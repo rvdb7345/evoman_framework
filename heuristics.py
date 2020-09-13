@@ -48,8 +48,11 @@ class DistanceRankSelection(SimulationRank):
             distances.append(distance)
 
         # normalize, so we get probabilities
-        sum_distances = sum(distances)
-        distances_norm = [distance / sum_distances for distance in distances]
+        # sum_distances = sum(distances)
+        # distances_norm = [distance / sum_distances for distance in distances]
+        min_distance, max_distance = min(distances), max(distances)
+        range_distance = max_distance - min_distance
+        distances_norm = [(distance - min_distance) / range_distance for distance in distances]
 
         return distances_norm
 
