@@ -445,18 +445,18 @@ class SimulationRoulette(SimulationRank):
 
 
 class SimulationAdaptiveMutationNpointCrossover(SimulationRank):
-    def __init__(
-            self, experiment_name, nr_inputs, nr_layers,
-            nr_neurons, nr_outputs, activation_func, activation_distr,
-            lower_bound, upper_bound, pop_size, nr_gens,
-            mutation_chance, nr_skip_parents, enemies,  multiplemode
-        ):
-        super().__init__(
-            experiment_name, nr_inputs, nr_layers, nr_neurons,
-            nr_outputs, activation_func, activation_distr,
-            lower_bound, upper_bound, pop_size, nr_gens,
-            mutation_chance, nr_skip_parents, enemies,  multiplemode
-        )
+    # def __init__(
+    #         self, experiment_name, nr_inputs, nr_layers,
+    #         nr_neurons, nr_outputs, activation_func, activation_distr,
+    #         lower_bound, upper_bound, pop_size, nr_gens,
+    #         mutation_chance, nr_skip_parents, enemies,  multiplemode
+    #     ):
+    #     super().__init__(
+    #         experiment_name, nr_inputs, nr_layers, nr_neurons,
+    #         nr_outputs, activation_func, activation_distr,
+    #         lower_bound, upper_bound, pop_size, nr_gens,
+    #         mutation_chance, nr_skip_parents, enemies,  multiplemode
+    #     )
 
     def mutation(self, child_params, str_layer, child_cont, parent1, parent2, W2, b2):
         # add noise (mutation)
@@ -492,9 +492,129 @@ class SimulationAdaptiveMutationNpointCrossover(SimulationRank):
         return child_params
 
     def crossover_division(self, fitnesses, id1, id2):
-        cancel_negativity = 1
-        prob1 = (fitnesses[id1] + cancel_negativity) / ((fitnesses[id2] + cancel_negativity) +
-                                                        (fitnesses[id1] + cancel_negativity))
-        prob2 = 1 - prob1
+        prob1 = 0.0
+        min_fitnesses = min(fitnesses)
+        if min_fitnesses <= 0:
+            make_positive = abs(min_fitnesses) + 1
+            prob1 = (fitnesses[id1] + make_positive) / ((fitnesses[id2] + make_positive) +
+                                                            (fitnesses[id1] + make_positive))
+        else:
+            prob1 = fitnesses[id1] / (fitnesses[id1] + fitnesses[id2])
 
-        return prob1, prob2
+        return prob1, 1 - prob1
+
+    def crossover_and_mutation(self, parent1, parent2, id1, id2, fitnesses):
+        """
+        Cross genes for each layer in hidden network by weighted linear combination.
+        The probability is for now drawn from a uniform distribution (see make_new_generation)
+
+        (according to a relative probability based on the fitnes of each parent??? --> 
+        less diversity, cause a greedy approach --> so maybe not necessary?)
+        """
+
+        # setup variables for child controller and parametrs, nr of layer and
+        # parameters of parents
+        child_cont, child_params = test_controller(self.controller_id, self.nn_topology),  {}
+        self.controller_id += 1
+        network1, network2 = parent1.get_params(), parent2.get_params()
+
+        # performs crossover per layer 
+        for layer in range(self.tot_layers):
+            str_layer = str(layer)
+
+            # retrieve matrices parents and perform weighted linear combination
+            W1, W2 = network1["W" + str_layer], network2["W" + str_layer]
+            b1, b2 = network1["b" + str_layer], network2["b" + str_layer]
+            activation_funcs = network1["activation" + str_layer], network2["activation" + str_layer]
+
+            # performs crossover
+            prob1, prob2 = self.crossover_division(fitnesses, id1, id2)
+            child_params = self.crossover(child_params, prob1, prob2, W1, W2, b1, b2, str_layer)
+
+            # determine activation function by same probabilities
+            active_func = np.random.choice(activation_funcs, p=[prob1, prob2])
+            child_params["activation" + str_layer] = active_func
+
+            child_params = self.mutation(child_params, str_layer, child_cont, parent1, parent2, W2, b2)
+
+            # adjust for limits weights
+            weights_child = child_params["W" + str_layer]
+            bias_child = child_params["b" + str_layer]
+            weights_child[weights_child > self.upper_bound] = self.upper_bound
+            weights_child[weights_child < self.lower_bound] = self.lower_bound
+            bias_child[bias_child > self.upper_bound] = self.upper_bound
+            bias_child[bias_child < self.lower_bound] = self.lower_bound
+
+        # create network and return child
+        child_cont.create_network(child_params)
+        return child_cont
+
+    def make_new_generation(self, fit_norm_sorted, sorted_controls, fitnesses):
+        """
+        Crossover gense for a given population
+        """
+
+        # start creating children based on pairs of parents
+        children = []
+        for i in range(0, self.pop_size, self.nr_skip_parents):
+
+            # rank selection of two parents
+            id1, parent1 = self.parent_selection(fit_norm_sorted, sorted_controls)
+            id2, parent2 = self.parent_selection(fit_norm_sorted, sorted_controls)
+
+            # create child and add to children list
+            child = self.crossover_and_mutation(parent1, parent2, id1, id2, fitnesses)
+            children.append(child)
+
+        # select parents based on normilzed probabilites of the fitnesses who
+        # do not survive
+        sorted_controls = self.determine_survival(fit_norm_sorted, sorted_controls, children)
+
+        return sorted_controls
+
+    def run_evolutionary_algo(self):
+        """
+        Run evolutionary algorithm in parallel
+        """
+
+        ## necessary probabilites for rank selection
+        ranks = list(range(1, self.pop_size + 1, 1))
+        sum_ranks = sum(ranks)
+        fit_norm = [rank / sum_ranks for rank in ranks]
+
+        now = datetime.now()
+        dt_string = now.strftime("%d/%m/%Y %H:%M:%S")
+
+        generation_sum_df = pd.DataFrame(columns=['datetime', 'gen', 'enemies', 'fit_max', 'fit_mean'])
+
+        # start evolutionary algorithm
+        for gen in tqdm(range(self.nr_gens)):
+
+            fitnesses, player_lifes = self.run_parallel(gen)
+
+            # create a (proportional) cdf for the fitnesses
+            sorted_controls = [
+                parent for _, parent in sorted(
+                    list(zip(fitnesses, self.pcontrols)), key=lambda x: x[0]
+                )
+            ]
+            fitnesses.sort()
+
+            generation_sum_df = generation_sum_df.append(
+                {'datetime': dt_string, 'gen': gen, 'enemies': self.enemies[0], 'fit_max': max(fitnesses),
+                 'fit_mean': self.mean_fitness_gens[gen]}, ignore_index=True)
+
+            # make new generation
+            self.pcontrols = self.make_new_generation(fit_norm, sorted_controls, fitnesses)
+
+        # run final solution in parallel
+        fitnesses, player_lifes = self.run_parallel(self.nr_gens)
+
+        # save the best solution of the entire run
+        self.save_best_solution(self.enemies[0], self.best_fit, self.best_sol)
+
+        # save the mean and the max fitness during each run
+        self.save_generations(generation_sum_df)
+
+        # plot the results (mean and standard deviation) over the generations
+        self.simple_errorbar()
