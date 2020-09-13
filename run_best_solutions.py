@@ -11,20 +11,43 @@ from controller_julien import test_controller
 from controller import Controller
 import numpy as np
 
+experiment_name = "best_solutions_test"
+if not os.path.exists(experiment_name):
+    os.makedirs(experiment_name)
 
-def run_one_parallel(
-    pcontrols, enemies, pop_size, best_fit, gen,
-    not_improved, mean_fitness_gens, stds_fitness_gens,
-        mean_p_lifes_gens, stds_p_lifes_gens,
-        mean_e_lifes_gens, stds_e_lifes_gens,
-        best_sol
-    ):
+
+def play_game(pcont, enemies, multiplemode):
     """
-    Runs one parralel simulation in the Evoman framework
+    Helper function to simulate a game in the Evoman framework
     """
+    env = Environment(
+        experiment_name=experiment_name,
+        enemies=enemies,
+        multiplemode=multiplemode,
+        playermode="ai",
+        player_controller=pcont,
+        enemymode="static",
+        level=2,
+        speed="fastest",
+        logs="off"
+    )
+
+    return env.play(pcont=pcont)
+
+
+if __name__ == '__main__':
+
+    with open('best_results', 'rb') as config_df_file:
+        config_df = pickle.load(config_df_file)
+
+    enemies = 8
+    repetitions = 5
+    selected_df = config_df.loc[config_df['enemies'] == enemies]
+
+    controllers = selected_df['best_solution'].values
 
     # create input including the number of neurons and the enemies so this isn't in the simulate function
-    pool_input = [(pcont, enemies, "no") for pcont in pcontrols]
+    pool_input = [(pcont, [enemies], "no") for pcont in controllers for i in range(repetitions)]
 
     # run the simulations in parallel
     pool = Pool(cpu_count())
@@ -32,33 +55,22 @@ def run_one_parallel(
     pool.close()
     pool.join()
 
+    # pool_list = []
+    # for i in range(len(pool_input)):
+    #     pool_list.append(play_game(pool_input[i][0], pool_input[i][1], pool_input[i][2]))
+
     # get the fitnesses from the total results formatted as [(f, p, e, t), (...), ...]
-    fitnesses = [pool_list[i][0] for i in range(pop_size)]
-    player_lifes = [pool_list[i][1] for i in range(population_size)]
-    enemies_lifes = [pool_list[i][2] for i in range(population_size)]
+    fitnesses = [pool_list[i][0] for i in range(len(pool_list))]
+    player_lifes = [pool_list[i][1] for i in range(len(pool_list))]
+    enemies_lifes = [pool_list[i][2] for i in range(len(pool_list))]
 
-    best_fit_gen = max(fitnesses)
-    if best_fit_gen > best_fit:
-        best_fit = best_fit_gen
-        best_sol = pcontrols[fitnesses.index(best_fit)]
-        not_improved = 0
-    else:
-        not_improved += 1
+    fitnesses_row_per_sol = np.reshape(fitnesses, (int(len(pool_list)/repetitions),repetitions))
+    player_lifes_row_per_sol = np.reshape(player_lifes, (int(len(pool_list)/repetitions),repetitions))
+    enemies_lifes_row_per_sol = np.reshape(enemies_lifes, (int(len(pool_list)/repetitions),repetitions))
 
-    mean_fitness_gens[gen] = np.mean(fitnesses)
-    stds_fitness_gens[gen] = np.std(fitnesses)
+    individual_gain = player_lifes_row_per_sol - enemies_lifes_row_per_sol
+    mean_individual_gain = np.mean(individual_gain, axis=1)
 
-    mean_p_lifes_gens[gen] = np.mean(player_lifes)
-    stds_p_lifes_gens[gen] = np.std(player_lifes)
-
-    mean_e_lifes_gens[gen] = np.mean(enemies_lifes)
-    stds_e_lifes_gens[gen] = np.std(enemies_lifes)
-
-    return fitnesses, best_fit, player_lifes, enemies, best_sol
-
-
-with open('best_results', 'rb') as config_dictionary_file:
-    config_dictionary = pickle.load(config_dictionary_file)
-
-    # After config_dictionary is read from file
-    print(config_dictionary)
+    plt.figure()
+    plt.boxplot(mean_individual_gain)
+    plt.show()
