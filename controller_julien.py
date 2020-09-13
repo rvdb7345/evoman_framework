@@ -5,7 +5,7 @@ class test_controller(Controller):
     """
     Implements controller structure for player
     """
-    def __init__(self, nn_topology, mutation_step_size=0.1, lb=-1, ub=1):
+    def __init__(self, nn_topology, mutation_step_size=1.0, lb=-1, ub=1):
         """
         Initializes with a list of amount of neurons. Each index
         indicates the a hidden layer
