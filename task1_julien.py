@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 from environment import Environment
 from controller_julien import test_controller
 
+
 experiment_name = "task1_julien"
 if not os.path.exists(experiment_name):
     os.makedirs(experiment_name)
@@ -85,8 +86,46 @@ def crossover_and_mutation(parent1, parent2, prob1, prob2, nn_topology, mutation
 
     return child_cont
 
+def max_distances_topology(nn_topology, lb=-1, ub=1):
+    """
+    Determines the max possbile distance between the weight matrices for all
+    layer in the neural network. This is possible because we assume that the 
+    wieght matrices are bounded as the greates distances is between one matrix
+    filled withe lower bound values and one with upper bound values
+
+    Note, the matrix norm used is the Fobrenius norm.
+    """
+    max_dist = 0
+    for layer in nn_topology:
+        tot_weights = layer["input_dim"] * layer["output_dim"]
+        lb_vec = np.ones(tot_weights) * lb
+        ub_vec = np.ones(tot_weights) * ub
+        diff_vec = ub_vec - lb_vec
+        max_dist += np.sqrt(np.dot(diff_vec, diff_vec))
+
+    return max_dist 
+
+def enough_distances_NN(pcont1, pcont2, max_dist, min_dist_percentage):
+    """
+    Return True if the total distance of all layers between two neural networks
+    divided by the theoretically possible distancce is greater than a minimum 
+    percentage.
+    """
+    params1, params2 = pcont1.get_params(), pcont2.get_params()
+    distance, n_layers = 0, pcont1.get_nr_layers()
+
+    for layer in range(nr_layers):
+        str_layer = str(layer)
+        W1, W2 = params1["W" + str_layer], params2["W" + str_layer]
+        diff = (W1 - W2).flatten()
+        distance += np.sqrt(np.dot(diff, diff))
+
+    return distance / max_dist >= min_dist_percentage
+
 def roulette_rank_selection(fit_norm, sorted_controls):
     """
+    Perfrom one roulette rank selection based on the (linear) normalized 
+    probabilites of the fitnesses (THIS ALSO COULD )
     """
     return np.random.choice(sorted_controls, p=fit_norm)
 
@@ -95,7 +134,7 @@ def roulette_wheel_selection(fit_norm, pcontrols, id_prev=-1):
     Selects parent controller by means of roulette wheel selection.
     Note, that it asssumes that the fitness is normalized between 0 and 1.
 
-    ROULETTE WHEEL IS NOT THE BASED OPTION WHEN VALUES CAN BE NEGATIVE
+    ROULETTE WHEEL IS NOT THE BEST OPTION WHEN VALUES CAN BE NEGATIVE
     --> possible solution is to firs rank the parents and determine the probability
         on their ranking.
     """
@@ -110,6 +149,7 @@ def roulette_wheel_selection(fit_norm, pcontrols, id_prev=-1):
             return idx, pcontrols[idx + 1]
 
     return idx, pcontrols[len(pcontrols) - 1]
+    
 
 def make_new_generation(pop_size, int_skip, nn_topology, fitnesses, sorted_controls, mutation_chance):
     """

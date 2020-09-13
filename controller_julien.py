@@ -61,16 +61,6 @@ class test_controller(Controller):
         """
         return 1. / (1. + np.exp(-X))
 
-    # def one_layer_forward(self, X_prev, W_curr, b_curr, activation="sigmoid"):
-    #     """
-    #     Performs the calculations in current layer.
-    #     Returns output of current layer
-    #     """
-    #     assert activation in self.activations_funcs, "Activation function not found"
-
-    #     V_curr = np.dot(W_curr, X_prev) + b_curr
-    #     return self.activations_funcs[activation](V_curr)
-
     def control(self, inputs, controller):
         """
         Perfroms a full forward propagation of a neural network. Returns
