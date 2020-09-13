@@ -390,18 +390,6 @@ class SimulationRank(object):
         plt.show()
     
 class SimulationRoulette(SimulationRank):
-    # def __init__(
-    #         self, experiment_name, nr_inputs, nr_layers, 
-    #         nr_neurons, nr_outputs, activation_func, activation_distr,
-    #         lower_bound, upper_bound, pop_size, nr_gens, 
-    #         mutation_chance, nr_skip_parents, enemies,  multiplemode
-    #     ):
-    #     super().__init__(
-    #         experiment_name, nr_inputs, nr_layers, nr_neurons, 
-    #         nr_outputs, activation_func, activation_distr,
-    #         lower_bound, upper_bound, pop_size, nr_gens, 
-    #         mutation_chance, nr_skip_parents, enemies,  multiplemode
-    #     )
 
     def run_evolutionary_algo(self):
         """
@@ -444,18 +432,6 @@ class SimulationRoulette(SimulationRank):
 
 
 class SimulationAdaptiveMutationNpointCrossover(SimulationRank):
-    # def __init__(
-    #         self, experiment_name, nr_inputs, nr_layers,
-    #         nr_neurons, nr_outputs, activation_func, activation_distr,
-    #         lower_bound, upper_bound, pop_size, nr_gens,
-    #         mutation_chance, nr_skip_parents, enemies,  multiplemode
-    #     ):
-    #     super().__init__(
-    #         experiment_name, nr_inputs, nr_layers, nr_neurons,
-    #         nr_outputs, activation_func, activation_distr,
-    #         lower_bound, upper_bound, pop_size, nr_gens,
-    #         mutation_chance, nr_skip_parents, enemies,  multiplemode
-    #     )
 
     def mutation(self, child_params, str_layer, child_cont, parent1, parent2, W2, b2):
         # add noise (mutation)
