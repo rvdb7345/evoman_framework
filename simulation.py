@@ -80,18 +80,17 @@ class SimulationRank(object):
         self.multiplemode = "no"
         self.dir_path = os.path.abspath('')
 
-        self.controller_index = 0
-
         # initialize random AI players for given pop size
-        self.pcontrols = []
+        self.pcontrols, self.controller_id = [], 0
         for i in range(pop_size):
             pcont = test_controller(
-                self.controller_index, self.nn_topology, lb=self.lower_bound, ub=self.upper_bound
+                self.controller_id, self.nn_topology, lb=self.lower_bound, ub=self.upper_bound
             )
             pcont.initialize_random_network()
             self.pcontrols.append(pcont)
+            self.controller_id += 1
 
-            self.controller_index += 1
+        # self.current_ids = list(range(pop_size))
 
         # initialize tracking variables for statistics of simulation
         self.mean_fitness_gens = np.zeros(nr_gens + 1)
@@ -148,6 +147,7 @@ class SimulationRank(object):
             pickle.dump(generation_sum_df, config_dictionary_file)
 
     def save_best_solution(self, enemies, best_fit, sol):
+        # Hier is op dit moment een error ???
         best_solution_df = pd.DataFrame({'enemies': enemies, 'fitness': best_fit, 'best_solution': sol})
 
         if os.path.exists(os.path.join(self.dir_path, 'best_results')):
@@ -176,8 +176,10 @@ class SimulationRank(object):
 
         return env.play(pcont=pcont)
 
-    def mutation(self, child_params, str_layer, child_cont, parent1, parent2, W2, b2):
-        # add noise (mutation)
+    def mutation(self, child_params, str_layer):
+        """
+        Add standard normally distributed noise (mutate) to parameters child 
+        """
         if np.random.uniform(0, 1) < self.mutation_chance:
             noise = np.random.normal(0, 1)
             child_params["W" + str_layer] += noise
@@ -186,18 +188,25 @@ class SimulationRank(object):
         return child_params
 
     def crossover(self, child_params, prob1, prob2, W1, W2, b1, b2, str_layer):
+        """
+        Linear weighted crossover of the weights in a certain layer
+        """
         child_params["W" + str_layer] = prob1 * W1 + prob2 * W2
         child_params["b" + str_layer] = prob1 * b1 + prob2 * b2
 
         return child_params
 
     def crossover_division(self):
+        """
+        Determines the weight of the linear crossover based on a Standard
+        Normal distributed probability 
+        """
         prob1 = np.random.uniform(0, 1)
         prob2 = 1 - prob1
 
         return prob1, prob2
 
-    def crossover_and_mutation(self, parent1, parent2, id1, id2, fitnesses):
+    def crossover_and_mutation(self, parent1, parent2):
         """
         Cross genes for each layer in hidden network by weighted linear combination.
         The probability is for now drawn from a uniform distribution (see make_new_generation)
@@ -208,8 +217,8 @@ class SimulationRank(object):
 
         # setup variables for child controller and parametrs, nr of layer and
         # parameters of parents
-        child_cont, child_params = test_controller(self.controller_index, self.nn_topology),  {}
-        self.controller_index += 1
+        child_cont, child_params = test_controller(self.controller_id, self.nn_topology),  {}
+        self.controller_id += 1
         network1, network2 = parent1.get_params(), parent2.get_params()
 
         # performs crossover per layer 
@@ -221,16 +230,15 @@ class SimulationRank(object):
             b1, b2 = network1["b" + str_layer], network2["b" + str_layer]
             activation_funcs = network1["activation" + str_layer], network2["activation" + str_layer]
 
-            # determine (uniform) probability of genes inherited by parents
-            prob1, prob2 = self.crossover_division(fitnesses, id1, id2)
-
+            # performs crossover
+            prob1, prob2 = self.crossover_division()
             child_params = self.crossover(child_params, prob1, prob2, W1, W2, b1, b2, str_layer)
 
             # determine activation function by same probabilities
             active_func = np.random.choice(activation_funcs, p=[prob1, prob2])
             child_params["activation" + str_layer] = active_func
 
-            child_params = self.mutation(child_params, str_layer, child_cont, parent1, parent2, W2, b2)
+            child_params = self.mutation(child_params, str_layer)
 
             # adjust for limits weights
             weights_child = child_params["W" + str_layer]
@@ -244,48 +252,45 @@ class SimulationRank(object):
         child_cont.create_network(child_params)
         return child_cont
 
-    def parent_selection(self, fit_norm, sorted_controls, id_prev=-1):
+    def parent_selection(self, fit_norm, sorted_controls):
         """
         Perfrom one roulette rank selection based on the (linear) normalized 
         probabilites of the fitnesses (THIS ALSO COULD BE EXP)
         """
         pcont = np.random.choice(sorted_controls, p=fit_norm)
         idx = sorted_controls.index(pcont)
-        if id_prev == idx and idx + 1 < self.pop_size:
-            return idx, sorted_controls[idx + 1]
-        
         return idx, pcont
+
+    def determine_survival(self, fit_norm_sorted, sorted_controls, children):
+        """
+        """
+        reversed_norm = [fit_norm_sorted[self.pop_size - i - 1] for i, _ in enumerate(fit_norm_sorted)]
+        for _,  child in enumerate(children):
+            id_parent, parent = self.parent_selection(reversed_norm, sorted_controls)
+            sorted_controls[id_parent] = child
+
+        return sorted_controls            
 
     def make_new_generation(self, fit_norm_sorted, sorted_controls):
         """
         Crossover gense for a given population
         """
 
-        # start creating childrens by pairs (for only a quarter of the population)
-        # truncated "killing" selection
+        # start creating children based on pairs of parents
         children = []
         for i in range(0, self.pop_size, self.nr_skip_parents):
 
             # rank selection of two parents
-            id1, parent1 = self.parent_selection(fit_norm_sorted, sorted_controls, id_prev=-1)
-            id2, parent2 = self.parent_selection(fit_norm_sorted, sorted_controls, id_prev=-1)
+            _, parent1 = self.parent_selection(fit_norm_sorted, sorted_controls)
+            _, parent2 = self.parent_selection(fit_norm_sorted, sorted_controls)
 
             # create child and add to children list
-            child = self.crossover_and_mutation(parent1, parent2, id1, id2, fit_norm_sorted)
+            child = self.crossover_and_mutation(parent1, parent2)
             children.append(child)
 
         # select parents based on normilzed probabilites of the fitnesses who
         # do not survive
-        reversed_norm = [fit_norm_sorted[self.pop_size - i - 1] for i, _ in enumerate(fit_norm_sorted)]
-        # reversed_norm = [1 - fit for fit in fit_norm_sorted]
-        not_survived_contr = np.random.choice(sorted_controls, size=len(children), p=reversed_norm)
-        for i, pcont in enumerate(not_survived_contr):
-            idx = sorted_controls.index(pcont.id_nn)
-            sorted_controls[idx] = children[i]
-
-        # # replace the parents with the lowest score with the newly made children
-        # # and update population (truncation selection)
-        # sorted_controls[0:len(children)] = children
+        sorted_controls = self.determine_survival(fit_norm_sorted, sorted_controls, children)
 
         return sorted_controls
         
@@ -386,18 +391,18 @@ class SimulationRank(object):
         plt.show()
     
 class SimulationRoulette(SimulationRank):
-    def __init__(
-            self, experiment_name, nr_inputs, nr_layers, 
-            nr_neurons, nr_outputs, activation_func, activation_distr,
-            lower_bound, upper_bound, pop_size, nr_gens, 
-            mutation_chance, nr_skip_parents, enemies,  multiplemode
-        ):
-        super().__init__(
-            experiment_name, nr_inputs, nr_layers, nr_neurons, 
-            nr_outputs, activation_func, activation_distr,
-            lower_bound, upper_bound, pop_size, nr_gens, 
-            mutation_chance, nr_skip_parents, enemies,  multiplemode
-        )
+    # def __init__(
+    #         self, experiment_name, nr_inputs, nr_layers, 
+    #         nr_neurons, nr_outputs, activation_func, activation_distr,
+    #         lower_bound, upper_bound, pop_size, nr_gens, 
+    #         mutation_chance, nr_skip_parents, enemies,  multiplemode
+    #     ):
+    #     super().__init__(
+    #         experiment_name, nr_inputs, nr_layers, nr_neurons, 
+    #         nr_outputs, activation_func, activation_distr,
+    #         lower_bound, upper_bound, pop_size, nr_gens, 
+    #         mutation_chance, nr_skip_parents, enemies,  multiplemode
+    #     )
 
     def run_evolutionary_algo(self):
         """
