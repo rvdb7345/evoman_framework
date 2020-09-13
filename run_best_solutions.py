@@ -1,9 +1,10 @@
 import pickle
 import sys, os
+
 sys.path.insert(0, "evoman")
 
 from multiprocessing import Pool, cpu_count
-from tqdm  import tqdm
+from tqdm import tqdm
 import numpy as np
 import matplotlib.pyplot as plt
 from environment import Environment
@@ -36,7 +37,6 @@ def play_game(pcont, enemies, multiplemode):
 
 
 if __name__ == '__main__':
-
     with open('best_results', 'rb') as config_df_file:
         config_df = pickle.load(config_df_file)
 
@@ -64,9 +64,9 @@ if __name__ == '__main__':
     player_lifes = [pool_list[i][1] for i in range(len(pool_list))]
     enemies_lifes = [pool_list[i][2] for i in range(len(pool_list))]
 
-    fitnesses_row_per_sol = np.reshape(fitnesses, (int(len(pool_list)/repetitions),repetitions))
-    player_lifes_row_per_sol = np.reshape(player_lifes, (int(len(pool_list)/repetitions),repetitions))
-    enemies_lifes_row_per_sol = np.reshape(enemies_lifes, (int(len(pool_list)/repetitions),repetitions))
+    fitnesses_row_per_sol = np.reshape(fitnesses, (int(len(pool_list) / repetitions), repetitions))
+    player_lifes_row_per_sol = np.reshape(player_lifes, (int(len(pool_list) / repetitions), repetitions))
+    enemies_lifes_row_per_sol = np.reshape(enemies_lifes, (int(len(pool_list) / repetitions), repetitions))
 
     individual_gain = player_lifes_row_per_sol - enemies_lifes_row_per_sol
     mean_individual_gain = np.mean(individual_gain, axis=1)

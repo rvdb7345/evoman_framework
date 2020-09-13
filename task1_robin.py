@@ -37,7 +37,8 @@ def play_game(pcont, enemies, multiplemode):
         enemymode="static",
         level=2,
         speed="fastest",
-        logs="off"
+        logs="off",
+        randomini='yes'
     )
 
     return env.play(pcont=pcont)
@@ -133,7 +134,10 @@ def make_new_generation(pop_size, int_skip, nn_topology, fitnesses, sorted_contr
         # select parents with roullete wheel selection
         id1, parent1 = roulette_wheel_selection(fitnesses, sorted_controls)
         id2, parent2 = roulette_wheel_selection(fitnesses, sorted_controls, id_prev=id1)
-        prob1 = fitnesses[id1] / (fitnesses[id2] + fitnesses[id1])
+
+        cancel_negativity = 8.006367567651  # the lowest fitness you can get, i.e -log(timelimit)
+        prob1 = (fitnesses[id1] + cancel_negativity) / ((fitnesses[id2] + cancel_negativity) +
+                                                        (fitnesses[id1] + cancel_negativity))
         prob2 = 1 - prob1
 
         # create child and add to children list
@@ -359,12 +363,12 @@ if __name__ == "__main__":
     lower_bound = -1
     upper_bound = 1
     population_size = 100
-    n_generations = 25
+    n_generations = 5
     mutation_chance = 0.2
     int_skip = 4
     tau = 1 / population_size**2
 
-    repeats = 8
+    repeats = 1
     # num_cores = cpu_count()
 
     # this if for one hidden layer neural network

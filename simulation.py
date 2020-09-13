@@ -221,9 +221,18 @@ class SimulationRank(object):
             child = self.crossover_and_mutation(parent1, parent2)
             children.append(child)
 
-        # replace the parents with the lowest score with the newly made children
-        # and update population (truncation selection)
-        sorted_controls[0:len(children)] = children
+        # select parents based on normilzed probabilites of the fitnesses who
+        # do not survive
+        reversed_norm = [fit_norm_sorted[self.pop_size - i - 1] for i, _ in enumerate(fit_norm_sorted)]
+        # reversed_norm = [1 - fit for fit in fit_norm_sorted]
+        not_survived_contr = np.random.choice(sorted_controls, size=len(children), p=reversed_norm)
+        for i, pcont in enumerate(not_survived_contr):
+            idx = sorted_controls.index(pcont)
+            sorted_controls[idx] = children[i]
+
+        # # replace the parents with the lowest score with the newly made children
+        # # and update population (truncation selection)
+        # sorted_controls[0:len(children)] = children
 
         return sorted_controls
         
