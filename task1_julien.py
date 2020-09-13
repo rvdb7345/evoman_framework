@@ -109,7 +109,7 @@ def enough_distances_NN(pcont1, pcont2, max_dist, min_dist_percentage):
     """
     Return True if the total distance of all layers between two neural networks
     divided by the theoretically possible distancce is greater than a minimum 
-    percentage.
+    percentage (Forbrenius inner product)
     """
     params1, params2 = pcont1.get_params(), pcont2.get_params()
     distance, n_layers = 0, pcont1.get_nr_layers()
