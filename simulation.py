@@ -326,7 +326,7 @@ class SimulationRank(object):
         self.mean_e_lifes_gens[gen] = np.mean(enemies_lifes)
         self.stds_e_lifes_gens[gen] = np.std(enemies_lifes)
 
-        return fitnesses, player_lifes
+        return fitnesses, player_lifes, enemies_lifes
 
     def run_evolutionary_algo(self):
         """
@@ -346,7 +346,7 @@ class SimulationRank(object):
         # start evolutionary algorithm
         for gen in tqdm(range(self.nr_gens)):
 
-            fitnesses, player_lifes = self.run_parallel(gen)
+            fitnesses, player_lifes, enemies_lifes = self.run_parallel(gen)
 
             # create a (proportional) cdf for the fitnesses
             sorted_controls = [
@@ -364,7 +364,7 @@ class SimulationRank(object):
             self.pcontrols = self.make_new_generation(fit_norm, sorted_controls)
 
         # run final solution in parallel
-        fitnesses, player_lifes = self.run_parallel(self.nr_gens)
+        fitnesses, player_lifes, enemies_lifes = self.run_parallel(self.nr_gens)
 
         # save the best solution of the entire run
         self.save_best_solution(self.enemies[0], self.best_fit, self.best_sol)
@@ -399,7 +399,7 @@ class SimulationRoulette(SimulationRank):
         # start evolutionary algorithm
         for gen in tqdm(range(self.nr_gens)):
 
-            fitnesses = self.run_parallel(gen)
+            fitnesses, player_lifes, enemies_lifes = self.run_parallel(gen)
 
             # create a (proportional) cdf for the fitnesses
             sorted_controls = [
@@ -425,47 +425,14 @@ class SimulationRoulette(SimulationRank):
             self.pcontrols = self.make_new_generation(fit_norm, sorted_controls)
 
         # run final solution in parallel
-        fitnesses = self.run_parallel(self.nr_gens)
+        fitnesses, player_lifes, enemies_lifes = self.run_parallel(self.nr_gens)
 
         # plot the results (mean and standard deviation) over the generations
         self.simple_errorbar()
 
-
-class SimulationAdaptiveMutationNpointCrossover(SimulationRank):
-
-    def mutation(self, child_params, str_layer, child_cont, parent1, parent2, W2, b2):
-        # add noise (mutation)
-        if np.random.random() < 0.5:
-            mutation_step_size = parent1.mutation_step_size
-        else:
-            mutation_step_size = parent2.mutation_step_size
-
-        mutation_step_size = mutation_step_size * np.exp(self.tau * np.random.normal(0, 1))
-
-        child_cont.set_mutation_step_size(mutation_step_size)
-
-        # add noise (mutation)
-        for i in range(len(W2)):
-            for j in range(len(W2[0])):
-                if np.random.uniform(0, 1) < self.mutation_chance:
-                    child_params["W" + str_layer][i][j] += mutation_step_size
-
-
-        for i in range(np.shape(b2)[0]):
-            if np.random.uniform(0, 1) < self.mutation_chance:
-                child_params["b" + str_layer][i] += mutation_step_size
-
-        return child_params
-
-    def crossover(self, child_params, prob1, prob2, W1, W2, b1, b2, str_layer):
-        child_params["W" + str_layer] = np.array([[W1[i][j] if np.random.random() < prob1 else W2[i][j]
-                                                   for i in range(len(W2))] for j in range(len(W1[0]))]).T
-        child_params["b" + str_layer] = np.array([b1[i] if np.random.random() < prob1 else b2[i]
-                                                  for i in range(np.shape(b2)[0])])
-
-
-        return child_params
-
+class SimulationWeightedRank(SimulationRank):
+    """
+    """
     def crossover_division(self, fitnesses, id1, id2):
         prob1 = 0.0
         min_fitnesses = min(fitnesses)
@@ -510,7 +477,7 @@ class SimulationAdaptiveMutationNpointCrossover(SimulationRank):
             active_func = np.random.choice(activation_funcs, p=[prob1, prob2])
             child_params["activation" + str_layer] = active_func
 
-            child_params = self.mutation(child_params, str_layer, child_cont, parent1, parent2, W2, b2)
+            child_params = self.mutation(child_params, str_layer)
 
             # adjust for limits weights
             weights_child = child_params["W" + str_layer]
@@ -565,7 +532,7 @@ class SimulationAdaptiveMutationNpointCrossover(SimulationRank):
         # start evolutionary algorithm
         for gen in tqdm(range(self.nr_gens)):
 
-            fitnesses, player_lifes = self.run_parallel(gen)
+            fitnesses, player_lifes, enemies_lifes = self.run_parallel(gen)
 
             # create a (proportional) cdf for the fitnesses
             sorted_controls = [
@@ -583,7 +550,7 @@ class SimulationAdaptiveMutationNpointCrossover(SimulationRank):
             self.pcontrols = self.make_new_generation(fit_norm, sorted_controls, fitnesses)
 
         # run final solution in parallel
-        fitnesses, player_lifes = self.run_parallel(self.nr_gens)
+        fitnesses, player_lifes, enemies_lifes = self.run_parallel(self.nr_gens)
 
         # save the best solution of the entire run
         self.save_best_solution(self.enemies[0], self.best_fit, self.best_sol)
@@ -593,3 +560,297 @@ class SimulationAdaptiveMutationNpointCrossover(SimulationRank):
 
         # plot the results (mean and standard deviation) over the generations
         self.simple_errorbar()
+
+class SimulationAdaptiveMutationRank(SimulationRank):
+    def mutation(self, child_params, str_layer, child_cont, parent1, parent2, W2, b2):
+        # add noise (mutation)
+        if np.random.random() < 0.5:
+            mutation_step_size = parent1.mutation_step_size
+        else:
+            mutation_step_size = parent2.mutation_step_size
+
+        mutation_step_size = mutation_step_size * np.exp(self.tau * np.random.normal(0, 1))
+
+        child_cont.set_mutation_step_size(mutation_step_size)
+
+        # add noise (mutation)
+        for i in range(len(W2)):
+            for j in range(len(W2[0])):
+                if np.random.uniform(0, 1) < self.mutation_chance:
+                    child_params["W" + str_layer][i][j] += mutation_step_size
+
+
+        for i in range(np.shape(b2)[0]):
+            if np.random.uniform(0, 1) < self.mutation_chance:
+                child_params["b" + str_layer][i] += mutation_step_size
+
+        return child_params
+
+    def crossover_and_mutation(self, parent1, parent2):
+        """
+        Cross genes for each layer in hidden network by weighted linear combination.
+        The probability is for now drawn from a uniform distribution (see make_new_generation)
+
+        (according to a relative probability based on the fitnes of each parent??? --> 
+        less diversity, cause a greedy approach --> so maybe not necessary?)
+        """
+
+        # setup variables for child controller and parametrs, nr of layer and
+        # parameters of parents
+        child_cont, child_params = test_controller(self.controller_id, self.nn_topology),  {}
+        self.controller_id += 1
+        network1, network2 = parent1.get_params(), parent2.get_params()
+
+        # performs crossover per layer 
+        for layer in range(self.tot_layers):
+            str_layer = str(layer)
+
+            # retrieve matrices parents and perform weighted linear combination
+            W1, W2 = network1["W" + str_layer], network2["W" + str_layer]
+            b1, b2 = network1["b" + str_layer], network2["b" + str_layer]
+            activation_funcs = network1["activation" + str_layer], network2["activation" + str_layer]
+
+            # performs crossover
+            prob1, prob2 = self.crossover_division()
+            child_params = self.crossover(child_params, prob1, prob2, W1, W2, b1, b2, str_layer)
+
+            # determine activation function by same probabilities
+            active_func = np.random.choice(activation_funcs, p=[prob1, prob2])
+            child_params["activation" + str_layer] = active_func
+
+            child_params = self.mutation(child_params, str_layer, child_cont, parent1, parent2, W2, b2)
+
+            # adjust for limits weights
+            weights_child = child_params["W" + str_layer]
+            bias_child = child_params["b" + str_layer]
+            weights_child[weights_child > self.upper_bound] = self.upper_bound
+            weights_child[weights_child < self.lower_bound] = self.lower_bound
+            bias_child[bias_child > self.upper_bound] = self.upper_bound
+            bias_child[bias_child < self.lower_bound] = self.lower_bound
+
+        # create network and return child
+        child_cont.create_network(child_params)
+        return child_cont
+
+class SimulationAdaptiveMutationRoulette(SimulationRoulette):
+    def mutation(self, child_params, str_layer, child_cont, parent1, parent2, W2, b2):
+        # add noise (mutation)
+        if np.random.random() < 0.5:
+            mutation_step_size = parent1.mutation_step_size
+        else:
+            mutation_step_size = parent2.mutation_step_size
+
+        mutation_step_size = mutation_step_size * np.exp(self.tau * np.random.normal(0, 1))
+
+        child_cont.set_mutation_step_size(mutation_step_size)
+
+        # add noise (mutation)
+        for i in range(len(W2)):
+            for j in range(len(W2[0])):
+                if np.random.uniform(0, 1) < self.mutation_chance:
+                    child_params["W" + str_layer][i][j] += mutation_step_size
+
+
+        for i in range(np.shape(b2)[0]):
+            if np.random.uniform(0, 1) < self.mutation_chance:
+                child_params["b" + str_layer][i] += mutation_step_size
+
+        return child_params
+
+    def crossover_and_mutation(self, parent1, parent2):
+        """
+        Cross genes for each layer in hidden network by weighted linear combination.
+        The probability is for now drawn from a uniform distribution (see make_new_generation)
+
+        (according to a relative probability based on the fitnes of each parent??? --> 
+        less diversity, cause a greedy approach --> so maybe not necessary?)
+        """
+
+        # setup variables for child controller and parametrs, nr of layer and
+        # parameters of parents
+        child_cont, child_params = test_controller(self.controller_id, self.nn_topology),  {}
+        self.controller_id += 1
+        network1, network2 = parent1.get_params(), parent2.get_params()
+
+        # performs crossover per layer 
+        for layer in range(self.tot_layers):
+            str_layer = str(layer)
+
+            # retrieve matrices parents and perform weighted linear combination
+            W1, W2 = network1["W" + str_layer], network2["W" + str_layer]
+            b1, b2 = network1["b" + str_layer], network2["b" + str_layer]
+            activation_funcs = network1["activation" + str_layer], network2["activation" + str_layer]
+
+            # performs crossover
+            prob1, prob2 = self.crossover_division()
+            child_params = self.crossover(child_params, prob1, prob2, W1, W2, b1, b2, str_layer)
+
+            # determine activation function by same probabilities
+            active_func = np.random.choice(activation_funcs, p=[prob1, prob2])
+            child_params["activation" + str_layer] = active_func
+
+            child_params = self.mutation(child_params, str_layer, child_cont, parent1, parent2, W2, b2)
+
+            # adjust for limits weights
+            weights_child = child_params["W" + str_layer]
+            bias_child = child_params["b" + str_layer]
+            weights_child[weights_child > self.upper_bound] = self.upper_bound
+            weights_child[weights_child < self.lower_bound] = self.lower_bound
+            bias_child[bias_child > self.upper_bound] = self.upper_bound
+            bias_child[bias_child < self.lower_bound] = self.lower_bound
+
+        # create network and return child
+        child_cont.create_network(child_params)
+        return child_cont
+
+class SimulationAdaptiveMutationWeightedRank(SimulationWeightedRank):
+    def mutation(self, child_params, str_layer, child_cont, parent1, parent2, W2, b2):
+        # add noise (mutation)
+        if np.random.random() < 0.5:
+            mutation_step_size = parent1.mutation_step_size
+        else:
+            mutation_step_size = parent2.mutation_step_size
+
+        mutation_step_size = mutation_step_size * np.exp(self.tau * np.random.normal(0, 1))
+
+        child_cont.set_mutation_step_size(mutation_step_size)
+
+        # add noise (mutation)
+        for i in range(len(W2)):
+            for j in range(len(W2[0])):
+                if np.random.uniform(0, 1) < self.mutation_chance:
+                    child_params["W" + str_layer][i][j] += mutation_step_size
+
+
+        for i in range(np.shape(b2)[0]):
+            if np.random.uniform(0, 1) < self.mutation_chance:
+                child_params["b" + str_layer][i] += mutation_step_size
+
+        return child_params
+
+    def crossover_and_mutation(self, parent1, parent2, id1, id2, fitnesses):
+        """
+        Cross genes for each layer in hidden network by weighted linear combination.
+        The probability is for now drawn from a uniform distribution (see make_new_generation)
+
+        (according to a relative probability based on the fitnes of each parent??? --> 
+        less diversity, cause a greedy approach --> so maybe not necessary?)
+        """
+
+        # setup variables for child controller and parametrs, nr of layer and
+        # parameters of parents
+        child_cont, child_params = test_controller(self.controller_id, self.nn_topology),  {}
+        self.controller_id += 1
+        network1, network2 = parent1.get_params(), parent2.get_params()
+
+        # performs crossover per layer 
+        for layer in range(self.tot_layers):
+            str_layer = str(layer)
+
+            # retrieve matrices parents and perform weighted linear combination
+            W1, W2 = network1["W" + str_layer], network2["W" + str_layer]
+            b1, b2 = network1["b" + str_layer], network2["b" + str_layer]
+            activation_funcs = network1["activation" + str_layer], network2["activation" + str_layer]
+
+            # performs crossover
+            prob1, prob2 = self.crossover_division(fitnesses, id1, id2)
+            child_params = self.crossover(child_params, prob1, prob2, W1, W2, b1, b2, str_layer)
+
+            # determine activation function by same probabilities
+            active_func = np.random.choice(activation_funcs, p=[prob1, prob2])
+            child_params["activation" + str_layer] = active_func
+
+            child_params = self.mutation(child_params, str_layer, child_cont, parent1, parent2, W2, b2)
+
+            # adjust for limits weights
+            weights_child = child_params["W" + str_layer]
+            bias_child = child_params["b" + str_layer]
+            weights_child[weights_child > self.upper_bound] = self.upper_bound
+            weights_child[weights_child < self.lower_bound] = self.lower_bound
+            bias_child[bias_child > self.upper_bound] = self.upper_bound
+            bias_child[bias_child < self.lower_bound] = self.lower_bound
+
+        # create network and return child
+        child_cont.create_network(child_params)
+        return child_cont
+
+class SimulationAdaptiveMutationNpointCrossover(SimulationWeightedRank):
+
+    def mutation(self, child_params, str_layer, child_cont, parent1, parent2, W2, b2):
+        # add noise (mutation)
+        if np.random.random() < 0.5:
+            mutation_step_size = parent1.mutation_step_size
+        else:
+            mutation_step_size = parent2.mutation_step_size
+
+        mutation_step_size = mutation_step_size * np.exp(self.tau * np.random.normal(0, 1))
+
+        child_cont.set_mutation_step_size(mutation_step_size)
+
+        # add noise (mutation)
+        for i in range(len(W2)):
+            for j in range(len(W2[0])):
+                if np.random.uniform(0, 1) < self.mutation_chance:
+                    child_params["W" + str_layer][i][j] += mutation_step_size
+
+
+        for i in range(np.shape(b2)[0]):
+            if np.random.uniform(0, 1) < self.mutation_chance:
+                child_params["b" + str_layer][i] += mutation_step_size
+
+        return child_params
+
+    def crossover(self, child_params, prob1, prob2, W1, W2, b1, b2, str_layer):
+        child_params["W" + str_layer] = np.array([[W1[i][j] if np.random.random() < prob1 else W2[i][j]
+                                                   for i in range(len(W2))] for j in range(len(W1[0]))]).T
+        child_params["b" + str_layer] = np.array([b1[i] if np.random.random() < prob1 else b2[i]
+                                                  for i in range(np.shape(b2)[0])])
+
+
+        return child_params
+
+    def crossover_and_mutation(self, parent1, parent2, id1, id2, fitnesses):
+        """
+        Cross genes for each layer in hidden network by weighted linear combination.
+        The probability is for now drawn from a uniform distribution (see make_new_generation)
+
+        (according to a relative probability based on the fitnes of each parent??? --> 
+        less diversity, cause a greedy approach --> so maybe not necessary?)
+        """
+
+        # setup variables for child controller and parametrs, nr of layer and
+        # parameters of parents
+        child_cont, child_params = test_controller(self.controller_id, self.nn_topology),  {}
+        self.controller_id += 1
+        network1, network2 = parent1.get_params(), parent2.get_params()
+
+        # performs crossover per layer 
+        for layer in range(self.tot_layers):
+            str_layer = str(layer)
+
+            # retrieve matrices parents and perform weighted linear combination
+            W1, W2 = network1["W" + str_layer], network2["W" + str_layer]
+            b1, b2 = network1["b" + str_layer], network2["b" + str_layer]
+            activation_funcs = network1["activation" + str_layer], network2["activation" + str_layer]
+
+            # performs crossover
+            prob1, prob2 = self.crossover_division(fitnesses, id1, id2)
+            child_params = self.crossover(child_params, prob1, prob2, W1, W2, b1, b2, str_layer)
+
+            # determine activation function by same probabilities
+            active_func = np.random.choice(activation_funcs, p=[prob1, prob2])
+            child_params["activation" + str_layer] = active_func
+
+            child_params = self.mutation(child_params, str_layer, child_cont, parent1, parent2, W2, b2)
+
+            # adjust for limits weights
+            weights_child = child_params["W" + str_layer]
+            bias_child = child_params["b" + str_layer]
+            weights_child[weights_child > self.upper_bound] = self.upper_bound
+            weights_child[weights_child < self.lower_bound] = self.lower_bound
+            bias_child[bias_child > self.upper_bound] = self.upper_bound
+            bias_child[bias_child < self.lower_bound] = self.lower_bound
+
+        # create network and return child
+        child_cont.create_network(child_params)
+        return child_cont
