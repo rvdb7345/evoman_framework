@@ -7,3 +7,7 @@ __pycache__/
 
 # Ignore DSstore
 .DS_Store
+
+# Ignore Pickle file - best_results and generational_summary
+
+.pickle
