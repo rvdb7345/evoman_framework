@@ -1,6 +1,5 @@
 import ga_algorithms_npoint as GA_Npoint
-
-from ga_algorithms_linear import GA_random_linear
+import ga_algorithms_linear as GA_linear
 
 if __name__ == "__main__":
 
