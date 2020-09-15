@@ -31,7 +31,8 @@ if __name__ == "__main__":
     #     show_plot=True,
     #     save_output=False
     # )
-    # sim.run_evolutionary_algo()
+    # for i in range(repeats):
+    #   sim.run_evolutionary_algo()
     # print("FINISHED RANDOM NPOINT")
 
     sim = GA_distanceroulette_weightedNpoint_adaptmutation(
@@ -79,7 +80,8 @@ if __name__ == "__main__":
         show_plot=True,
         save_output=True
     )
-    sim.run_evolutionary_algo()
+    for i in range(repeats):
+        sim.run_evolutionary_algo()
     print("FINISHED ROULETTE WEIGHTED NPOINT ADAPTIVE MUTATION")
 
     # sim = GA_random_linear(
