@@ -531,6 +531,103 @@ class GA_roulette_randomNpoint(GA_random_Npoint):
         if self.show_plot:
             self.simple_errorbar()
 
+class GA_roulette_randomNpoint_scramblemutation(GA_roulette_randomNpoint):
+    """
+    Roulette wheel selection method for reproduction and survival, random N-point
+    crossover and scramble mutation
+    """
+    def mutation(self, child_params, str_layer):
+        """
+        Performs scramble mutation by random shuffling a set of weights of the
+        neural network for the child
+        """
+
+        # scramble the child's parameters for mutation
+        start_point = random.randint(1, 3)
+        end_point = random.randint(start_point, len(child_params["W" + str_layer]))
+        
+        for i in range(start_point, end_point):
+            np.random.shuffle(child_params["W" + str_layer][i])                             
+                
+        return child_params
+
+class GA_roulette_randomNpoint_adaptmutation(GA_roulette_randomNpoint):
+    """
+    Roulette wheel selection method for reproduction and survival, random N-point
+    crossover and self-adaptive mutation
+    """
+
+    def mutation(self, child_params, str_layer, child_cont, parent1, parent2, W2, b2):
+        """
+        Performs self-adaptive mutation
+        """
+        
+        # determine mutation step size that will be used from one of the parents
+        if np.random.random() < 0.5:
+            mutation_step_size = parent1.mutation_step_size
+        else:
+            mutation_step_size = parent2.mutation_step_size
+
+        # get new mutation step size and set child's mutation step size equal to it
+        mutation_step_size = mutation_step_size * np.exp(self.tau * np.random.normal(0, 1))
+        child_cont.set_mutation_step_size(mutation_step_size)
+
+        # add noise (mutation) for the weights
+        for i in range(len(W2)):
+            for j in range(len(W2[0])):
+                if np.random.uniform(0, 1) < self.mutation_chance:
+                    child_params["W" + str_layer][i][j] += mutation_step_size
+
+        # add noise (mutation) for the biases
+        for i in range(np.shape(b2)[0]):
+            if np.random.uniform(0, 1) < self.mutation_chance:
+                child_params["b" + str_layer][i] += mutation_step_size
+
+        return child_params
+
+    def crossover_and_mutation(self, parent1, parent2):
+        """
+        Cross genes for each layer in hidden network by random N-point crossover combination.
+        The probability is drawn from a uniform distribution 
+        """
+
+        # setup variables for child controller and parametrs, nr of layer and
+        # parameters of parents
+        child_cont, child_params = test_controller(self.controller_id, self.nn_topology),  {}
+        self.controller_id += 1
+        network1, network2 = parent1.get_params(), parent2.get_params()
+
+        # performs crossover per layer 
+        for layer in range(self.tot_layers):
+            str_layer = str(layer)
+
+            # retrieve matrices parents and perform weighted linear combination
+            W1, W2 = network1["W" + str_layer], network2["W" + str_layer]
+            b1, b2 = network1["b" + str_layer], network2["b" + str_layer]
+            activation_funcs = network1["activation" + str_layer], network2["activation" + str_layer]
+
+            # performs crossover
+            prob1, prob2 = self.crossover_division()
+            child_params = self.crossover(child_params, prob1, prob2, W1, W2, b1, b2, str_layer)
+
+            # determine activation function by same probabilities
+            active_func = np.random.choice(activation_funcs, p=[prob1, prob2])
+            child_params["activation" + str_layer] = active_func
+
+            child_params = self.mutation(child_params, str_layer, child_cont, parent1, parent2, W2, b2)
+
+            # adjust for limits weights
+            weights_child = child_params["W" + str_layer]
+            bias_child = child_params["b" + str_layer]
+            weights_child[weights_child > self.upper_bound] = self.upper_bound
+            weights_child[weights_child < self.lower_bound] = self.lower_bound
+            bias_child[bias_child > self.upper_bound] = self.upper_bound
+            bias_child[bias_child < self.lower_bound] = self.lower_bound
+
+        # create network and return child
+        child_cont.create_network(child_params)
+        return child_cont
+
 class GA_roulette_weightedNpoint(GA_roulette_randomNpoint):
     """
     Roulette wheel selection method for reproduction and survival, weighted 
@@ -680,6 +777,26 @@ class GA_roulette_weightedNpoint(GA_roulette_randomNpoint):
         if self.show_plot:
             self.simple_errorbar()
 
+class GA_roulette_weightedNpoint_scramblemutation(GA_roulette_weightedNpoint):
+    """
+    Roulette wheel selection method for reproduction and survival, weighted N-point
+    crossover and scramble mutation
+    """
+    def mutation(self, child_params, str_layer):
+        """
+        Performs scramble mutation by random shuffling a set of weights of the
+        neural network for the child
+        """
+
+        # scramble the child's parameters for mutation
+        start_point = random.randint(1, 3)
+        end_point = random.randint(start_point, len(child_params["W" + str_layer]))
+        
+        for i in range(start_point, end_point):
+            np.random.shuffle(child_params["W" + str_layer][i])                             
+                
+        return child_params
+
 class GA_roulette_weightedNpoint_adaptmutation(GA_roulette_weightedNpoint):
     """
     Roulette wheel selection method for reproduction and survival, weighted 
@@ -687,23 +804,27 @@ class GA_roulette_weightedNpoint_adaptmutation(GA_roulette_weightedNpoint):
     """
     
     def mutation(self, child_params, str_layer, child_cont, parent1, parent2, W2, b2):
-        # add noise (mutation)
+        """
+        Performs self-adaptive mutation
+        """
+        
+        # determine mutation step size that will be used from one of the parents
         if np.random.random() < 0.5:
             mutation_step_size = parent1.mutation_step_size
         else:
             mutation_step_size = parent2.mutation_step_size
 
+        # get new mutation step size and set child's mutation step size equal to it
         mutation_step_size = mutation_step_size * np.exp(self.tau * np.random.normal(0, 1))
-
         child_cont.set_mutation_step_size(mutation_step_size)
 
-        # add noise (mutation)
+        # add noise (mutation) for the weights
         for i in range(len(W2)):
             for j in range(len(W2[0])):
                 if np.random.uniform(0, 1) < self.mutation_chance:
                     child_params["W" + str_layer][i][j] += mutation_step_size
 
-
+        # add noise (mutation) for the biases
         for i in range(np.shape(b2)[0]):
             if np.random.uniform(0, 1) < self.mutation_chance:
                 child_params["b" + str_layer][i] += mutation_step_size
@@ -752,10 +873,159 @@ class GA_roulette_weightedNpoint_adaptmutation(GA_roulette_weightedNpoint):
         child_cont.create_network(child_params)
         return child_cont
 
+class GA_roulette_weightedNpoint_adaptscramblemutation(GA_roulette_weightedNpoint_adaptmutation):
+    """
+    Roulette wheel selection method for reproduction and survival, weighted 
+    N-point crossover, self-adaptive mutation combined with a scramble mutation
+    """
+    def mutation(self, child_params, str_layer, child_cont, parent1, parent2, W2, b2):
+        """
+        Performs self-adaptive mutation
+        """
+        
+        # determine mutation step size that will be used from one of the parents
+        if np.random.random() < 0.5:
+            mutation_step_size = parent1.mutation_step_size
+        else:
+            mutation_step_size = parent2.mutation_step_size
+
+        # get new mutation step size and set child's mutation step size equal to it
+        mutation_step_size = mutation_step_size * np.exp(self.tau * np.random.normal(0, 1))
+        child_cont.set_mutation_step_size(mutation_step_size)
+
+        # add noise (mutation) for the weights
+        for i in range(len(W2)):
+            for j in range(len(W2[0])):
+                if np.random.uniform(0, 1) < self.mutation_chance:
+                    child_params["W" + str_layer][i][j] += mutation_step_size
+
+        # add noise (mutation) for the biases
+        for i in range(np.shape(b2)[0]):
+            if np.random.uniform(0, 1) < self.mutation_chance:
+                child_params["b" + str_layer][i] += mutation_step_size
+
+        # scramble the child's parameters for mutation
+        start_point = random.randint(1, 3)
+        end_point = random.randint(start_point, len(child_params["W" + str_layer]))   
+        for i in range(start_point, end_point):
+            np.random.shuffle(child_params["W" + str_layer][i])                             
+                
+        return child_params
+
 class GA_distanceroulette_randomNpoint(GA_roulette_randomNpoint):
     """
     Roulette wheel selection with a heuristc based on the relative distance to 
     all parents, random N-point crossover and mutiation
+    """
+
+    def get_distance_probs(self, parent1, sorted_controls):
+        """
+        Determines the  probability based on the distance of the first
+        parent selected relatively to that of all the others.
+        """
+        distances, params1 = [], parent1.get_params()
+        for other_parent in sorted_controls:
+            params2 = other_parent.get_params()
+            distance = 0
+            
+            for layer in range(self.tot_layers):
+                weight_str = "W" + str(layer)
+                W1, W2 = params1[weight_str], params2[weight_str]
+                diff = (W1 - W2).flatten()
+                distance += np.sqrt(np.dot(diff, diff))
+
+            distances.append(distance)
+
+        # normalize, so we get probabilities
+        sum_distances = sum(distances)
+        distances_norm = [distance / sum_distances for distance in distances]
+
+        return distances_norm
+
+    def make_new_generation(self, fit_norm_sorted, sorted_controls):
+        """
+        Crossover gense for a given population
+        """
+
+        # start creating children based on pairs of parents
+        children = []
+        for i in range(0, self.pop_size, self.nr_skip_parents):
+
+            # roulette wheel selection of two parents with the second
+            # parent selected with help of distance heuristic
+            _, parent1 = self.parent_selection(fit_norm_sorted, sorted_controls)
+            distances_norm = self.get_distance_probs(parent1, sorted_controls)
+            _, parent2 = self.parent_selection(distances_norm, sorted_controls)
+
+            # create child and add to children list
+            child = self.crossover_and_mutation(parent1, parent2)
+            children.append(child)
+
+        # select parents based on normilzed probabilites of the fitnesses who
+        # do not survive
+        sorted_controls = self.determine_survival(fit_norm_sorted, sorted_controls, children)
+
+        return sorted_controls
+
+class GA_distanceroulette_randomNpoint_scramblemutation(GA_roulette_randomNpoint_scramblemutation):
+    """
+    Roulette wheel selection with a heuristc based on the relative distance to 
+    all parents, weighted N-point crossover and random mutiation
+    """
+
+    def get_distance_probs(self, parent1, sorted_controls):
+        """
+        Determines the  probability based on the distance of the first
+        parent selected relatively to that of all the others.
+        """
+        distances, params1 = [], parent1.get_params()
+        for other_parent in sorted_controls:
+            params2 = other_parent.get_params()
+            distance = 0
+            
+            for layer in range(self.tot_layers):
+                weight_str = "W" + str(layer)
+                W1, W2 = params1[weight_str], params2[weight_str]
+                diff = (W1 - W2).flatten()
+                distance += np.sqrt(np.dot(diff, diff))
+
+            distances.append(distance)
+
+        # normalize, so we get probabilities
+        sum_distances = sum(distances)
+        distances_norm = [distance / sum_distances for distance in distances]
+
+        return distances_norm
+
+    def make_new_generation(self, fit_norm_sorted, sorted_controls):
+        """
+        Crossover gense for a given population
+        """
+
+        # start creating children based on pairs of parents
+        children = []
+        for i in range(0, self.pop_size, self.nr_skip_parents):
+
+            # roulette wheel selection of two parents with the second
+            # parent selected with help of distance heuristic
+            _, parent1 = self.parent_selection(fit_norm_sorted, sorted_controls)
+            distances_norm = self.get_distance_probs(parent1, sorted_controls)
+            _, parent2 = self.parent_selection(distances_norm, sorted_controls)
+
+            # create child and add to children list
+            child = self.crossover_and_mutation(parent1, parent2)
+            children.append(child)
+
+        # select parents based on normilzed probabilites of the fitnesses who
+        # do not survive
+        sorted_controls = self.determine_survival(fit_norm_sorted, sorted_controls, children)
+
+        return sorted_controls
+
+class GA_distanceroulette_randomNpoint_adaptmutation(GA_roulette_randomNpoint_adaptmutation):
+    """
+    Roulette wheel selection with a heuristc based on the relative distance to 
+    all parents, random N-point crossover and self-adaptive mutiation
     """
 
     def get_distance_probs(self, parent1, sorted_controls):
@@ -862,6 +1132,61 @@ class GA_distanceroulette_weightedNpoint(GA_roulette_weightedNpoint):
 
         return sorted_controls
 
+class GA_distanceroulette_weightedNpoint_scramblemutation(GA_roulette_weightedNpoint_scramblemutation):
+    """
+    Roulette wheel selection with a heuristc based on the relative distance to 
+    all parents, weighted N-point crossover and scramble mutiation
+    """
+
+    def get_distance_probs(self, parent1, sorted_controls):
+        """
+        Determines the  probability based on the distance of the first
+        parent selected relatively to that of all the others.
+        """
+        distances, params1 = [], parent1.get_params()
+        for other_parent in sorted_controls:
+            params2 = other_parent.get_params()
+            distance = 0
+            
+            for layer in range(self.tot_layers):
+                weight_str = "W" + str(layer)
+                W1, W2 = params1[weight_str], params2[weight_str]
+                diff = (W1 - W2).flatten()
+                distance += np.sqrt(np.dot(diff, diff))
+
+            distances.append(distance)
+
+        # normalize, so we get probabilities
+        sum_distances = sum(distances)
+        distances_norm = [distance / sum_distances for distance in distances]
+
+        return distances_norm
+
+    def make_new_generation(self, fit_norm_sorted, sorted_controls, fitnesses):
+        """
+        Crossover gense for a given population
+        """
+
+        # start creating children based on pairs of parents
+        children = []
+        for i in range(0, self.pop_size, self.nr_skip_parents):
+
+            # roulette wheel selection of two parents and second parent selected
+            # with help of the distance heuristic
+            id1, parent1 = self.parent_selection(fit_norm_sorted, sorted_controls)
+            distances_norm = self.get_distance_probs(parent1, sorted_controls)
+            id2, parent2 = self.parent_selection(distances_norm, sorted_controls)
+
+            # create child and add to children list
+            child = self.crossover_and_mutation(parent1, parent2, id1, id2, fitnesses)
+            children.append(child)
+
+        # select parents based on normilzed probabilites of the fitnesses who
+        # do not survive
+        sorted_controls = self.determine_survival(fit_norm_sorted, sorted_controls, children)
+
+        return sorted_controls
+
 class GA_distanceroulette_weightedNpoint_adaptmutation(GA_roulette_weightedNpoint_adaptmutation):
     """
     Roulette wheel selection with a heuristc based on the relative distance to 
@@ -916,3 +1241,44 @@ class GA_distanceroulette_weightedNpoint_adaptmutation(GA_roulette_weightedNpoin
         sorted_controls = self.determine_survival(fit_norm_sorted, sorted_controls, children)
 
         return sorted_controls
+
+class GA_distanceroulette_weightedNpoint_adaptscramblemutation(GA_distanceroulette_weightedNpoint_adaptmutation):
+    """
+    Roulette wheel selection with a heuristc based on the relative distance to 
+    all parents, weighted N-point crossover and self-adaptive mutiation combined
+    with a scramble mutation
+    """
+    
+    def mutation(self, child_params, str_layer, child_cont, parent1, parent2, W2, b2):
+        """
+        Performs self-adaptive mutation
+        """
+        
+        # determine mutation step size that will be used from one of the parents
+        if np.random.random() < 0.5:
+            mutation_step_size = parent1.mutation_step_size
+        else:
+            mutation_step_size = parent2.mutation_step_size
+
+        # get new mutation step size and set child's mutation step size equal to it
+        mutation_step_size = mutation_step_size * np.exp(self.tau * np.random.normal(0, 1))
+        child_cont.set_mutation_step_size(mutation_step_size)
+
+        # add noise (self-adaptive mutation) for the weights
+        for i in range(len(W2)):
+            for j in range(len(W2[0])):
+                if np.random.uniform(0, 1) < self.mutation_chance:
+                    child_params["W" + str_layer][i][j] += mutation_step_size
+
+        # add noise (self-adaptive mutation) for the biases
+        for i in range(np.shape(b2)[0]):
+            if np.random.uniform(0, 1) < self.mutation_chance:
+                child_params["b" + str_layer][i] += mutation_step_size
+
+        # scramble the child's parameters (scramble mutation)
+        start_point = random.randint(1, 3)
+        end_point = random.randint(start_point, len(child_params["W" + str_layer]))   
+        for i in range(start_point, end_point):
+            np.random.shuffle(child_params["W" + str_layer][i])                             
+                
+        return child_params
