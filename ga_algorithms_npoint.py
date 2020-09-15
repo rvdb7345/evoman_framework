@@ -87,6 +87,8 @@ class GA_random_Npoint(object):
         self.save_output = save_output
         self.dir_path = os.path.abspath('')
 
+        print("Do we try to save the output? : ", self.save_output)
+
         # initialize random AI players for given pop size
         self.pcontrols, self.controller_id = [], 0
         for i in range(pop_size):
@@ -149,7 +151,8 @@ class GA_random_Npoint(object):
             pickle.dump(generation_sum_df, config_dictionary_file)
 
     def save_best_solution(self, enemies, best_fit, sol):
-        best_solution_df = pd.DataFrame({'enemies': enemies, 'fitness': best_fit, 'best_solution': sol}, index=[0])
+        best_solution_df = pd.DataFrame({'model': self.name, 'enemies': enemies,
+                                         'fitness': best_fit, 'best_solution': sol}, index=[0])
 
         if os.path.exists(os.path.join(self.dir_path, 'best_results')):
             with open(os.path.join(self.dir_path, 'best_results'), 'rb') as config_df_file:
@@ -366,7 +369,7 @@ class GA_random_Npoint(object):
             fitnesses, player_lifes, enemies_lifes = self.run_parallel(gen)
 
             generation_sum_df = generation_sum_df.append(
-                {'datetime': dt_string, 'gen': gen, 'enemies': self.enemies[0], 'fit_max': max(fitnesses),
+                {'model': self.name, 'datetime': dt_string, 'gen': gen, 'enemies': self.enemies[0], 'fit_max': max(fitnesses),
                  'fit_mean': self.mean_fitness_gens[gen]}, ignore_index=True)
 
             # make new generation
@@ -374,6 +377,11 @@ class GA_random_Npoint(object):
 
         # run final solution in parallel
         fitnesses, player_lifes, enemies_lifes = self.run_parallel(self.nr_gens)
+
+        generation_sum_df = generation_sum_df.append(
+            {'model': self.name, 'datetime': dt_string, 'gen': self.nr_gens, 'enemies': self.enemies[0],
+             'fit_max': max(fitnesses),
+             'fit_mean': self.mean_fitness_gens[gen]}, ignore_index=True)
 
         # save the best solution of the entire run save the mean and 
         # the max fitness during each run
@@ -468,6 +476,11 @@ class GA_roulette_randomNpoint(GA_random_Npoint):
         Run evolutionary algorithm in parallel
         """
 
+        now = datetime.now()
+        dt_string = now.strftime("%d/%m/%Y %H:%M:%S")
+
+        generation_sum_df = pd.DataFrame(columns=['datetime', 'gen', 'enemies', 'fit_max', 'fit_mean'])
+
         # start evolutionary algorithm
         for gen in tqdm(range(self.nr_gens)):
 
@@ -493,11 +506,26 @@ class GA_roulette_randomNpoint(GA_random_Npoint):
                 sum_fits = sum(fitnesses)
                 fit_norm = [fit / sum_fits for fit in fitnesses]
 
+            generation_sum_df = generation_sum_df.append(
+                {'model': self.name, 'datetime': dt_string, 'gen': gen, 'enemies': self.enemies[0], 'fit_max': max(fitnesses),
+                 'fit_mean': self.mean_fitness_gens[gen]}, ignore_index=True)
+
             # make new generation
             self.pcontrols = self.make_new_generation(fit_norm, sorted_controls)
 
         # run final solution in parallel
         fitnesses, player_lifes, enemies_lifes = self.run_parallel(self.nr_gens)
+
+        generation_sum_df = generation_sum_df.append(
+            {'model': self.name, 'datetime': dt_string, 'gen': self.nr_gens, 'enemies': self.enemies[0],
+             'fit_max': max(fitnesses),
+             'fit_mean': self.mean_fitness_gens[gen]}, ignore_index=True)
+
+        # save the best solution of the entire run save the mean and
+        # the max fitness during each run
+        if self.save_output:
+            self.save_best_solution(self.enemies[0], self.best_fit, self.best_sol)
+            self.save_generations(generation_sum_df)
 
         # plot the results (mean and standard deviation) over the generations
         if self.show_plot:
@@ -594,6 +622,12 @@ class GA_roulette_weightedNpoint(GA_roulette_randomNpoint):
         Run evolutionary algorithm in parallel
         """
 
+        now = datetime.now()
+        dt_string = now.strftime("%d/%m/%Y %H:%M:%S")
+
+        generation_sum_df = pd.DataFrame(columns=['datetime', 'gen', 'enemies', 'fit_max', 'fit_mean'])
+
+
         # start evolutionary algorithm
         for gen in tqdm(range(self.nr_gens)):
 
@@ -619,11 +653,28 @@ class GA_roulette_weightedNpoint(GA_roulette_randomNpoint):
                 sum_fits = sum(fitnesses)
                 fit_norm = [fit / sum_fits for fit in fitnesses]
 
+            generation_sum_df = generation_sum_df.append(
+                {'model': self.name, 'datetime': dt_string, 'gen': gen, 'enemies': self.enemies[0],
+                 'fit_max': max(fitnesses),
+                 'fit_mean': self.mean_fitness_gens[gen]}, ignore_index=True)
+
             # make new generation
             self.pcontrols = self.make_new_generation(fit_norm, sorted_controls, fitnesses)
 
         # run final solution in parallel
         fitnesses, player_lifes, enemies_lifes = self.run_parallel(self.nr_gens)
+
+        generation_sum_df = generation_sum_df.append(
+            {'model': self.name, 'datetime': dt_string, 'gen': self.nr_gens, 'enemies': self.enemies[0],
+             'fit_max': max(fitnesses),
+             'fit_mean': self.mean_fitness_gens[gen]}, ignore_index=True)
+
+        # save the best solution of the entire run save the mean and
+        # the max fitness during each run
+        if self.save_output:
+            self.save_best_solution(self.enemies[0], self.best_fit, self.best_sol)
+            self.save_generations(generation_sum_df)
+
 
         # plot the results (mean and standard deviation) over the generations
         if self.show_plot:

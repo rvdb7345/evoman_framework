@@ -148,10 +148,16 @@ class SimulationRank(object):
     def save_best_solution(self, enemies, best_fit, sol):
         best_solution_df = pd.DataFrame({'enemies': enemies, 'fitness': best_fit, 'best_solution': sol}, index=[0])
 
+        print( 'the best sol df: ', best_solution_df)
+
         if os.path.exists(os.path.join(self.dir_path, 'best_results')):
             with open(os.path.join(self.dir_path, 'best_results'), 'rb') as config_df_file:
                 config_df = pickle.load(config_df_file)
-                best_solution_df = pd.concat([best_solution_df, config_df], ignore_index=True)
+
+                print('the config df: ', config_df)
+
+                print('These things are concated: {}, {}'.format(best_solution_df, config_df))
+                best_solution_df = pd.concat([best_solution_df, config_df])
 
         with open('best_results', 'wb') as config_dictionary_file:
             pickle.dump(best_solution_df, config_dictionary_file)
@@ -1031,7 +1037,7 @@ class SimulationSwapMutation(SimulationWeightedRank):
         less diversity, cause a greedy approach --> so maybe not necessary?)
         """
 
-        # setup variables for child controller and parametrs, nr of layer and
+        # setup variables for child controller and parameters, nr of layer and
         # parameters of parents
         child_cont, child_params = test_controller(self.controller_id, self.nn_topology),  {}
         self.controller_id += 1
