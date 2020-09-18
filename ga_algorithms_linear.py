@@ -1,6 +1,6 @@
 import ga_algorithms_npoint as GA_algos
 
-class GA_random_linear(GA_algos.GA_random_Npoint):
+class GA_randomlinear(GA_algos.GA_random_Npoint):
     def crossover(self, child_params, prob1, prob2, W1, W2, b1, b2, str_layer):
         """
         Linear weighted crossover of the weights in a certain layer

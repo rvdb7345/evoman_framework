@@ -10,11 +10,11 @@
 ################################################################################
 
 # imports framework
-import sys, os
+import sys
 sys.path.insert(0, "evoman")
 
 # import built-in packages
-import pickle
+# import pickle
 from multiprocessing import Pool, cpu_count
 from datetime import datetime
 
@@ -34,8 +34,8 @@ class GA_random_Npoint(object):
     mutation and survival method is based on random chance. The only method that
     is fixed is the crossover (random N-point crossover)
     """
-    def __init__(self, 
-                experiment_name="random_npoint", 
+    def __init__(self,
+                name = "random_randomNpoint_normal",
                 nr_inputs=20, 
                 nr_layers=1, 
                 nr_neurons=10, 
@@ -50,14 +50,12 @@ class GA_random_Npoint(object):
                 nr_skip_parents=4,
                 enemies=[8], 
                 multiplemode = "no",
-                replacement = False,
-                show_plot=False,
-                save_output=False,
+                replacement = False
         ):
-        # set experiment name and make neural network topology
-        self.name = experiment_name
-        if not os.path.exists(experiment_name):
-            os.makedirs(experiment_name)
+        # make neural network topology
+        self.name = name
+        # if not os.path.exists(experiment_name):
+        #     os.makedirs(experiment_name)
         self.tot_layers = nr_layers + 1
         self.nn_topology = []
         self.make_NN_topology(
@@ -83,21 +81,15 @@ class GA_random_Npoint(object):
         self.enemies = enemies
         self.multiplemode = multiplemode
         self.replacement = replacement
-        self.show_plot = show_plot
-        self.save_output = save_output
-        self.dir_path = os.path.abspath('')
+        # self.show_plot = show_plot
+        # self.save_output = save_output
+        # self.dir_path = os.path.abspath('')
 
-        print("Do we try to save the output? : ", self.save_output)
+        # print("Do we try to save the output? : ", self.save_output)
 
         # initialize random AI players for given pop size
         self.pcontrols, self.controller_id = [], 0
-        for i in range(pop_size):
-            pcont = test_controller(
-                self.controller_id, self.nn_topology, lb=self.lower_bound, ub=self.upper_bound
-            )
-            pcont.initialize_random_network()
-            self.pcontrols.append(pcont)
-            self.controller_id += 1
+        self.initialize_controllers()
 
         # initialize tracking variables for statistics of simulation
         self.mean_fitness_gens = np.zeros(nr_gens + 1)
@@ -141,26 +133,39 @@ class GA_random_Npoint(object):
 
             self.nn_topology.append(layer_topology)
 
-    def save_generations(self, generation_sum_df):
-        if os.path.exists(os.path.join(self.dir_path, 'generational_summary')):
-            with open(os.path.join(self.dir_path, 'generational_summary'), 'rb') as config_df_file:
-                config_df = pickle.load(config_df_file)
-                generation_sum_df = pd.concat([generation_sum_df, config_df])
+    def initialize_controllers(self):
+        """
+        Initialize random AI players for given pop size
+        """
+        self.pcontrols, self.controller_id = [], 0
+        for i in range(self.pop_size):
+            pcont = test_controller(
+                self.controller_id, self.nn_topology, lb=self.lower_bound, ub=self.upper_bound
+            )
+            pcont.initialize_random_network()
+            self.pcontrols.append(pcont)
+            self.controller_id += 1
 
-        with open('generational_summary', 'wb') as config_dictionary_file:
-            pickle.dump(generation_sum_df, config_dictionary_file)
+    # def save_generations(self, generation_sum_df):
+    #     if os.path.exists(os.path.join(self.dir_path, 'generational_summary')):
+    #         with open(os.path.join(self.dir_path, 'generational_summary'), 'rb') as config_df_file:
+    #             config_df = pickle.load(config_df_file)
+    #             generation_sum_df = pd.concat([generation_sum_df, config_df])
 
-    def save_best_solution(self, enemies, best_fit, sol):
-        best_solution_df = pd.DataFrame({'model': self.name, 'enemies': enemies,
-                                         'fitness': best_fit, 'best_solution': sol}, index=[0])
+    #     with open('generational_summary', 'wb') as config_dictionary_file:
+    #         pickle.dump(generation_sum_df, config_dictionary_file)
 
-        if os.path.exists(os.path.join(self.dir_path, 'best_results')):
-            with open(os.path.join(self.dir_path, 'best_results'), 'rb') as config_df_file:
-                config_df = pickle.load(config_df_file)
-                best_solution_df = pd.concat([best_solution_df, config_df], ignore_index=True)
+    # def save_best_solution(self, enemies, best_fit, sol):
+    #     best_solution_df = pd.DataFrame({'model': self.name, 'enemies': enemies,
+    #                                      'fitness': best_fit, 'best_solution': sol}, index=[0])
 
-        with open('best_results', 'wb') as config_dictionary_file:
-            pickle.dump(best_solution_df, config_dictionary_file)
+    #     if os.path.exists(os.path.join(self.dir_path, 'best_results')):
+    #         with open(os.path.join(self.dir_path, 'best_results'), 'rb') as config_df_file:
+    #             config_df = pickle.load(config_df_file)
+    #             best_solution_df = pd.concat([best_solution_df, config_df], ignore_index=True)
+
+    #     with open('best_results', 'wb') as config_dictionary_file:
+    #         pickle.dump(best_solution_df, config_dictionary_file)
 
     def play_game(self, pcont):
         """
@@ -383,15 +388,18 @@ class GA_random_Npoint(object):
              'fit_max': max(fitnesses),
              'fit_mean': self.mean_fitness_gens[gen]}, ignore_index=True)
 
-        # save the best solution of the entire run save the mean and 
-        # the max fitness during each run
-        if self.save_output:
-            self.save_best_solution(self.enemies[0], self.best_fit, self.best_sol)
-            self.save_generations(generation_sum_df)
+        # returns certain statistics  (watch out self.enemies is hardcoded)
+        return self.enemies[0], self.best_fit, self.best_sol, generation_sum_df
+        
+        # # save the best solution of the entire run save the mean and 
+        # # the max fitness during each run
+        # if self.save_output:
+        #     self.save_best_solution(self.enemies[0], self.best_fit, self.best_sol)
+        #     self.save_generations(generation_sum_df)
 
-        # plot the results (mean and standard deviation) over the generations
-        if self.show_plot:
-            self.simple_errorbar()
+        # # plot the results (mean and standard deviation) over the generations
+        # if self.show_plot:
+        #     self.simple_errorbar()
     
     def simple_errorbar(self):
         """
@@ -406,6 +414,19 @@ class GA_random_Npoint(object):
         plt.xlabel("Generation (#)")
         plt.ylabel("Fitness")
         plt.show()
+
+    def reset_algorithm(self):
+        """
+        Resets tracking variables so that a new simulation can be started
+        """
+        self.initialize_controllers()
+        self.mean_fitness_gens = np.zeros(self.nr_gens + 1)
+        self.stds_fitness_gens = np.zeros(self.nr_gens + 1)
+        self.mean_p_lifes_gens = np.zeros(self.nr_gens + 1)
+        self.stds_p_lifes_gens = np.zeros(self.nr_gens + 1)
+        self.mean_e_lifes_gens = np.zeros(self.nr_gens + 1)
+        self.stds_e_lifes_gens = np.zeros(self.nr_gens + 1)
+        self.best_fit, self.best_sol, self.not_improved = 0, None, 0
 
 class GA_roulette_randomNpoint(GA_random_Npoint):
     """
@@ -521,15 +542,18 @@ class GA_roulette_randomNpoint(GA_random_Npoint):
              'fit_max': max(fitnesses),
              'fit_mean': self.mean_fitness_gens[gen]}, ignore_index=True)
 
-        # save the best solution of the entire run save the mean and
-        # the max fitness during each run
-        if self.save_output:
-            self.save_best_solution(self.enemies[0], self.best_fit, self.best_sol)
-            self.save_generations(generation_sum_df)
+        # returns certain statistics  (watch out self.enemies is hardcoded)
+        return self.enemies[0], self.best_fit, self.best_sol, generation_sum_df
+
+        # # save the best solution of the entire run save the mean and
+        # # the max fitness during each run
+        # if self.save_output:
+        #     self.save_best_solution(self.enemies[0], self.best_fit, self.best_sol)
+        #     self.save_generations(generation_sum_df)
 
         # plot the results (mean and standard deviation) over the generations
-        if self.show_plot:
-            self.simple_errorbar()
+        # if self.show_plot:
+        #     self.simple_errorbar()
 
 class GA_roulette_randomNpoint_scramblemutation(GA_roulette_randomNpoint):
     """
@@ -766,16 +790,19 @@ class GA_roulette_weightedNpoint(GA_roulette_randomNpoint):
              'fit_max': max(fitnesses),
              'fit_mean': self.mean_fitness_gens[gen]}, ignore_index=True)
 
-        # save the best solution of the entire run save the mean and
-        # the max fitness during each run
-        if self.save_output:
-            self.save_best_solution(self.enemies[0], self.best_fit, self.best_sol)
-            self.save_generations(generation_sum_df)
+        # returns certain statistics  (watch out self.enemies is hardcoded)
+        return self.enemies[0], self.best_fit, self.best_sol, generation_sum_df
+
+        # # save the best solution of the entire run save the mean and
+        # # the max fitness during each run
+        # if self.save_output:
+        #     self.save_best_solution(self.enemies[0], self.best_fit, self.best_sol)
+        #     self.save_generations(generation_sum_df)
 
 
         # plot the results (mean and standard deviation) over the generations
-        if self.show_plot:
-            self.simple_errorbar()
+        # if self.show_plot:
+        #     self.simple_errorbar()
 
 class GA_roulette_weightedNpoint_scramblemutation(GA_roulette_weightedNpoint):
     """
