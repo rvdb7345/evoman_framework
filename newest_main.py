@@ -22,6 +22,9 @@ import ga_algorithms_linear as LinearAlgos
 # import monte carlo object (for optimization)
 from monte_carlo import Monte_Carlo
 
+# tuning functions
+from tuning import gridsearch_linearNpoint
+
 # dictionary mapping name to algorithm object
 ALGORITHMS = {
     "random_randomNpoint_normal": NpointAlgos.GA_random_Npoint,
@@ -70,7 +73,7 @@ if __name__ == "__main__":
     # get command-line arguments and make name of algorithm and name experiment
     parser = set_arguments()
     algorithm_name = parser.selection_and_surival + "_" + parser.crossover + "_" + parser.mutation
-    experiment_name = algorithm_name + "_" + parser.name
+    # experiment_name = algorithm_name + "_" + parser.name
 
     # ensures name algoritm is valid
     if algorithm_name not in ALGORITHMS:
@@ -86,8 +89,22 @@ if __name__ == "__main__":
     if len(parser.enemies) > 1:
         multiplemode = "yes"
 
-    # retrieve algorithm and initialize
     algorithm = ALGORITHMS[algorithm_name]
+
+    # all neceassary GA input for tuning
+    params = [
+        algorithm_name, INPUTS, parser.layers, parser.neurons, OUTPUTS, 
+        parser.activation, activation_distr, LB, UB, parser.pop_size,
+        parser.gens, parser.enemies, multiplemode, REPLACEMENT
+    ]
+
+    # if wanted, tunes paramaters and uses tuned parameters
+    if parser.tune:
+        filename = "tuning_" + algorithm_name
+        gridsearch_linearNpoint(algorithm, filename, *params)
+        sys.exit("Tuning went succesfull")
+
+    # initialize algorithm
     GA = algorithm(
         name=algorithm_name,
         nr_inputs=INPUTS, 
@@ -111,7 +128,7 @@ if __name__ == "__main__":
     # else:
     #     sys.exit("Show plot is True")
     MC = Monte_Carlo(
-        experiment_name, 
+        algorithm_name, 
         GA, 
         parser.N, 
         parser.show_plot, 

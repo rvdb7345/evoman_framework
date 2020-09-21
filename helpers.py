@@ -59,11 +59,11 @@ def set_arguments():
         default=MUTATIONS, 
         help="mutation method of GA\n(default=[normal, scramble, adapt])"
     )
-    parser.add_argument(
-        "name",
-        type=str,
-        help="name of user so that results can be stored in a personal file/folder"
-    )
+    # parser.add_argument(
+    #     "name",
+    #     type=str,
+    #     help="name of user so that results can be stored in a personal file/folder"
+    # )
     parser.add_argument(
         "-layers", 
         type=int,

@@ -61,7 +61,7 @@ class Monte_Carlo(object):
 
             # save statistics
             if self.save_output:
-                self.save_best_solution(enemy,  best_fit, sol)
+                self.save_best_solution(enemy, best_fit, sol)
                 self.save_generations(generation_sum_df)
 
             # show simple error plot
