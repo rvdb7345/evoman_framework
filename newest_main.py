@@ -73,7 +73,7 @@ if __name__ == "__main__":
     # get command-line arguments and make name of algorithm and name experiment
     parser = set_arguments()
     algorithm_name = parser.selection_and_surival + "_" + parser.crossover + "_" + parser.mutation
-    # experiment_name = algorithm_name + "_" + parser.name
+    experiment_name = algorithm_name + "_" + parser.name
 
     # ensures name algoritm is valid
     if algorithm_name not in ALGORITHMS:
@@ -106,7 +106,7 @@ if __name__ == "__main__":
 
     # initialize algorithm
     GA = algorithm(
-        name=algorithm_name,
+        name=experiment_name,
         nr_inputs=INPUTS, 
         nr_layers=parser.layers, 
         nr_neurons=parser.neurons, 
@@ -128,7 +128,7 @@ if __name__ == "__main__":
     # else:
     #     sys.exit("Show plot is True")
     MC = Monte_Carlo(
-        algorithm_name, 
+        experiment_name, 
         GA, 
         parser.N, 
         parser.show_plot, 
