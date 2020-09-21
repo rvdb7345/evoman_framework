@@ -390,8 +390,8 @@ class GA_random_Npoint(object):
 
         # returns certain statistics  (watch out self.enemies is hardcoded)
         return self.enemies[0], self.best_fit, self.best_sol, generation_sum_df
-        
-        # # save the best solution of the entire run save the mean and 
+
+        # # save the best solution of the entire run save the mean and
         # # the max fitness during each run
         # if self.save_output:
         #     self.save_best_solution(self.enemies[0], self.best_fit, self.best_sol)

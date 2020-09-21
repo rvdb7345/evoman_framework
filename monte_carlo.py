@@ -30,24 +30,24 @@ class Monte_Carlo(object):
         print("Do we try to save the output? : ", self.save_output)
 
     def save_generations(self, generation_sum_df):
-        if os.path.exists(os.path.join(os.path.abspath(''), 'generational_summary')):
-            with open(os.path.join(os.path.abspath(''), 'generational_summary'), 'rb') as config_df_file:
+        if os.path.exists(os.path.join(os.path.abspath(''), 'gen_sum_' + self.name)):
+            with open(os.path.join(os.path.abspath(''), 'gen_sum_' + self.name), 'rb') as config_df_file:
                 config_df = pickle.load(config_df_file)
                 generation_sum_df = pd.concat([generation_sum_df, config_df])
 
-        with open('generational_summary', 'wb') as config_dictionary_file:
+        with open('gen_sum_' + self.name, 'wb') as config_dictionary_file:
             pickle.dump(generation_sum_df, config_dictionary_file)
 
     def save_best_solution(self, enemies, best_fit, sol):
         best_solution_df = pd.DataFrame({'model': self.name, 'enemies': enemies,
                                          'fitness': best_fit, 'best_solution': sol}, index=[0])
 
-        if os.path.exists(os.path.join(os.path.abspath(''), 'best_results')):
-            with open(os.path.join(os.path.abspath(''), 'best_results'), 'rb') as config_df_file:
+        if os.path.exists(os.path.join(os.path.abspath(''), 'best_sol_' + self.name)):
+            with open(os.path.join(os.path.abspath(''), 'best_sol_' + self.name), 'rb') as config_df_file:
                 config_df = pickle.load(config_df_file)
                 best_solution_df = pd.concat([best_solution_df, config_df], ignore_index=True)
 
-        with open('best_results', 'wb') as config_dictionary_file:
+        with open('best_sol_' + self.name, 'wb') as config_dictionary_file:
             pickle.dump(best_solution_df, config_dictionary_file)
 
     def run(self):
@@ -61,8 +61,8 @@ class Monte_Carlo(object):
 
             # save statistics
             if self.save_output:
-                self.save_best_solution(enemy, best_fit, sol)
-                self.save_generations(generation_sum_df)
+                self.save_best_solution(enemy,  best_fit, best_sol)
+                self.save_generations(generations_sum_df)
 
             # show simple error plot
             if self.show_plot:
