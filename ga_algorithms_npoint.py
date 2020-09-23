@@ -81,11 +81,6 @@ class GA_random_Npoint(object):
         self.enemies = enemies
         self.multiplemode = multiplemode
         self.replacement = replacement
-        # self.show_plot = show_plot
-        # self.save_output = save_output
-        # self.dir_path = os.path.abspath('')
-
-        # print("Do we try to save the output? : ", self.save_output)
 
         # initialize random AI players for given pop size
         self.pcontrols, self.controller_id = [], 0
@@ -145,27 +140,6 @@ class GA_random_Npoint(object):
             pcont.initialize_random_network()
             self.pcontrols.append(pcont)
             self.controller_id += 1
-
-    # def save_generations(self, generation_sum_df):
-    #     if os.path.exists(os.path.join(self.dir_path, 'generational_summary')):
-    #         with open(os.path.join(self.dir_path, 'generational_summary'), 'rb') as config_df_file:
-    #             config_df = pickle.load(config_df_file)
-    #             generation_sum_df = pd.concat([generation_sum_df, config_df])
-
-    #     with open('generational_summary', 'wb') as config_dictionary_file:
-    #         pickle.dump(generation_sum_df, config_dictionary_file)
-
-    # def save_best_solution(self, enemies, best_fit, sol):
-    #     best_solution_df = pd.DataFrame({'model': self.name, 'enemies': enemies,
-    #                                      'fitness': best_fit, 'best_solution': sol}, index=[0])
-
-    #     if os.path.exists(os.path.join(self.dir_path, 'best_results')):
-    #         with open(os.path.join(self.dir_path, 'best_results'), 'rb') as config_df_file:
-    #             config_df = pickle.load(config_df_file)
-    #             best_solution_df = pd.concat([best_solution_df, config_df], ignore_index=True)
-
-    #     with open('best_results', 'wb') as config_dictionary_file:
-    #         pickle.dump(best_solution_df, config_dictionary_file)
 
     def play_game(self, pcont):
         """
@@ -390,16 +364,6 @@ class GA_random_Npoint(object):
 
         # returns certain statistics  (watch out self.enemies is hardcoded)
         return self.enemies[0], self.best_fit, self.best_sol, generation_sum_df
-
-        # # save the best solution of the entire run save the mean and
-        # # the max fitness during each run
-        # if self.save_output:
-        #     self.save_best_solution(self.enemies[0], self.best_fit, self.best_sol)
-        #     self.save_generations(generation_sum_df)
-
-        # # plot the results (mean and standard deviation) over the generations
-        # if self.show_plot:
-        #     self.simple_errorbar()
     
     def simple_errorbar(self):
         """
@@ -545,16 +509,6 @@ class GA_roulette_randomNpoint(GA_random_Npoint):
         # returns certain statistics  (watch out self.enemies is hardcoded)
         return self.enemies[0], self.best_fit, self.best_sol, generation_sum_df
 
-        # # save the best solution of the entire run save the mean and
-        # # the max fitness during each run
-        # if self.save_output:
-        #     self.save_best_solution(self.enemies[0], self.best_fit, self.best_sol)
-        #     self.save_generations(generation_sum_df)
-
-        # plot the results (mean and standard deviation) over the generations
-        # if self.show_plot:
-        #     self.simple_errorbar()
-
 class GA_roulette_randomNpoint_scramblemutation(GA_roulette_randomNpoint):
     """
     Roulette wheel selection method for reproduction and survival, random N-point
@@ -651,6 +605,213 @@ class GA_roulette_randomNpoint_adaptmutation(GA_roulette_randomNpoint):
         # create network and return child
         child_cont.create_network(child_params)
         return child_cont
+
+class GA_random_weightedNpoint_adapt(GA_random_Npoint):
+    """
+    Random selection method for reproduction but an fitness proportional 
+    roulette selection for survival, weighted N-point crossover and 
+    self-adaptive mutation
+    """
+
+    def survival_selection(self, fit_norm_reversed, sorted_controls):
+        """
+        Perfrom one sruvival roulette fitness selection based on the (linear) 
+        normalized probabilites of the fitnesses
+        """
+        pcont = np.random.choice(sorted_controls, p=fit_norm_reversed)
+        idx = sorted_controls.index(pcont)
+        return idx, pcont
+
+    def determine_survival(self, children, fit_norm, sorted_controls):
+        """
+        Randomly replace parents by children. Note that two different methods
+        are possible: with replacement of child or without replacement
+        """
+        fit_norm_reversed = [fit_norm[self.pop_size - i - 1] for i, _ in enumerate(fit_norm)]
+
+        if not self.replacement:
+
+            # first select parents
+            id_parents = []
+            for _, child in enumerate(children):
+                id_parent, _ = self.survival_selection(fit_norm_reversed, sorted_controls)
+                id_parents.append(id_parent)
+
+            # replace parents by children
+            for id_parent, child in zip(id_parents, children):
+                self.pcontrols[id_parent] = child
+            
+            return self.pcontrols
+
+        # with replacement of children in the pool of survival selection
+        for _,  child in enumerate(children):
+            id_parent, _ = self.survival_selection(fit_norm_reversed, sorted_controls)
+            self.pcontrols[id_parent] = child
+
+        return self.pcontrols
+
+    def crossover_division(self, fitnesses, id1, id2):
+        """
+        Determines weighted probability for N-point crossover
+        """
+        prob1 = 0.0
+        min_fitnesses = min(fitnesses)
+        if min_fitnesses <= 0:
+            make_positive = abs(min_fitnesses) + 1
+            prob1 = (fitnesses[id1] + make_positive) / ((fitnesses[id2] + make_positive) +
+                                                            (fitnesses[id1] + make_positive))
+        else:
+            prob1 = fitnesses[id1] / (fitnesses[id1] + fitnesses[id2])
+
+        return prob1, 1 - prob1
+
+    def mutation(self, child_params, str_layer, child_cont, parent1, parent2, W2, b2):
+        """
+        Performs self-adaptive mutation
+        """
+        
+        # determine mutation step size that will be used from one of the parents
+        if np.random.random() < 0.5:
+            mutation_step_size = parent1.mutation_step_size
+        else:
+            mutation_step_size = parent2.mutation_step_size
+
+        # get new mutation step size and set child's mutation step size equal to it
+        mutation_step_size = mutation_step_size * np.exp(self.tau * np.random.normal(0, 1))
+        child_cont.set_mutation_step_size(mutation_step_size)
+
+        # add noise (mutation) for the weights
+        for i in range(len(W2)):
+            for j in range(len(W2[0])):
+                if np.random.uniform(0, 1) < self.mutation_chance:
+                    child_params["W" + str_layer][i][j] += mutation_step_size
+
+        # add noise (mutation) for the biases
+        for i in range(np.shape(b2)[0]):
+            if np.random.uniform(0, 1) < self.mutation_chance:
+                child_params["b" + str_layer][i] += mutation_step_size
+
+        return child_params
+
+    def crossover_and_mutation(self, parent1, parent2, id1, id2, fitnesses):
+        """
+        Cross genes for each layer in hidden network by weighted N-point crossover
+        """
+
+        # setup variables for child controller and parametrs, nr of layer and
+        # parameters of parents
+        child_cont, child_params = test_controller(self.controller_id, self.nn_topology),  {}
+        self.controller_id += 1
+        network1, network2 = parent1.get_params(), parent2.get_params()
+
+        # performs crossover per layer 
+        for layer in range(self.tot_layers):
+            str_layer = str(layer)
+
+            # retrieve matrices parents and perform weighted linear combination
+            W1, W2 = network1["W" + str_layer], network2["W" + str_layer]
+            b1, b2 = network1["b" + str_layer], network2["b" + str_layer]
+            activation_funcs = network1["activation" + str_layer], network2["activation" + str_layer]
+
+            # performs crossover
+            prob1, prob2 = self.crossover_division(fitnesses, id1, id2)
+            child_params = self.crossover(child_params, prob1, prob2, W1, W2, b1, b2, str_layer)
+
+            # determine activation function by same probabilities
+            active_func = np.random.choice(activation_funcs, p=[prob1, prob2])
+            child_params["activation" + str_layer] = active_func
+
+            child_params = self.mutation(child_params, str_layer, child_cont, parent1, parent2, W2, b2)
+
+            # adjust for limits weights
+            weights_child = child_params["W" + str_layer]
+            bias_child = child_params["b" + str_layer]
+            weights_child[weights_child > self.upper_bound] = self.upper_bound
+            weights_child[weights_child < self.lower_bound] = self.lower_bound
+            bias_child[bias_child > self.upper_bound] = self.upper_bound
+            bias_child[bias_child < self.lower_bound] = self.lower_bound
+
+        # create network and return child
+        child_cont.create_network(child_params)
+        return child_cont
+
+    def make_new_generation(self, fit_norm_sorted, sorted_controls, fitnesses):
+        """
+        Crossover gense for a given population
+        """
+
+        # start creating children based on pairs of parents
+        children = []
+        for i in range(0, self.pop_size, self.nr_skip_parents):
+
+            # roulette wheel selection of two parents
+            id1, parent1 = self.parent_selection()
+            id2, parent2 = self.parent_selection()
+
+            # create child and add to children list
+            child = self.crossover_and_mutation(parent1, parent2, id1, id2, fitnesses)
+            children.append(child)
+
+        # select parents based on normilzed probabilites of the fitnesses who
+        # do not survive
+        sorted_controls = self.determine_survival(fit_norm_sorted, sorted_controls, children)
+
+        return sorted_controls
+        
+    def run_evolutionary_algo(self):
+        """
+        Run evolutionary algorithm in parallel
+        """
+
+        now = datetime.now()
+        dt_string = now.strftime("%d/%m/%Y %H:%M:%S")
+
+        generation_sum_df = pd.DataFrame(columns=['datetime', 'gen', 'enemies', 'fit_max', 'fit_mean'])
+
+
+        # start evolutionary algorithm
+        for gen in tqdm(range(self.nr_gens)):
+
+            fitnesses, player_lifes, enemies_lifes = self.run_parallel(gen)
+
+            # create a (proportional) cdf for the fitnesses
+            sorted_controls = [
+                parent for _, parent in sorted(
+                    list(zip(fitnesses, self.pcontrols)), key=lambda x: x[0]
+                )
+            ]
+            fitnesses.sort()
+
+            # normalize fitness values to represent probabilites for 
+            # roulette wheel selection
+            best_fit_gen, worst_fit_gen = max(fitnesses), min(fitnesses)
+            fit_norm = []
+            if worst_fit_gen <= 0:
+                adjusted_fits = np.array(fitnesses) + abs(worst_fit_gen) + 1
+                sum_fits = adjusted_fits.sum()
+                fit_norm = [fit / sum_fits for fit in adjusted_fits]
+            else:
+                sum_fits = sum(fitnesses)
+                fit_norm = [fit / sum_fits for fit in fitnesses]
+
+            generation_sum_df = generation_sum_df.append(
+                {'model': self.name, 'datetime': dt_string, 'gen': gen, 'enemies': self.enemies[0],
+                 'fit_max': max(fitnesses),
+                 'fit_mean': self.mean_fitness_gens[gen]}, ignore_index=True)
+
+            # make new generation
+            self.pcontrols = self.make_new_generation(fit_norm, sorted_controls, fitnesses)
+
+        # run final solution in parallel
+        fitnesses, player_lifes, enemies_lifes = self.run_parallel(self.nr_gens)
+
+        generation_sum_df = generation_sum_df.append(
+            {'model': self.name, 'datetime': dt_string, 'gen': self.nr_gens, 'enemies': self.enemies[0],
+             'fit_max': max(fitnesses),
+             'fit_mean': self.mean_fitness_gens[gen]}, ignore_index=True)
+
+        # returns certain statistics  (watch out self.enemies is hardcoded)
+        return self.enemies[0], self.best_fit, self.best_sol, generation_sum_df
 
 class GA_roulette_weightedNpoint(GA_roulette_randomNpoint):
     """
@@ -792,17 +953,7 @@ class GA_roulette_weightedNpoint(GA_roulette_randomNpoint):
 
         # returns certain statistics  (watch out self.enemies is hardcoded)
         return self.enemies[0], self.best_fit, self.best_sol, generation_sum_df
-
-        # # save the best solution of the entire run save the mean and
-        # # the max fitness during each run
-        # if self.save_output:
-        #     self.save_best_solution(self.enemies[0], self.best_fit, self.best_sol)
-        #     self.save_generations(generation_sum_df)
-
-
-        # plot the results (mean and standard deviation) over the generations
-        # if self.show_plot:
-        #     self.simple_errorbar()
+    
 
 class GA_roulette_weightedNpoint_scramblemutation(GA_roulette_weightedNpoint):
     """

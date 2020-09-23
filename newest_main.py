@@ -29,6 +29,7 @@ from tuning import gridsearch_linearNpoint
 ALGORITHMS = {
     "random_randomNpoint_normal": NpointAlgos.GA_random_Npoint,
     "random_randomlinear_normal": LinearAlgos.GA_randomlinear,
+    "random_weightedNpoint_adapt": NpointAlgos.GA_random_weightedNpoint_adapt,
     "roulette_randomNpoint_normal": NpointAlgos.GA_roulette_randomNpoint,
     "roulette_randomlinear_normal":LinearAlgos.GA_roulette_randomlinear,
     "roulette_randomNpoint_scramble": NpointAlgos.GA_roulette_randomNpoint_scramblemutation,
@@ -64,8 +65,8 @@ INPUTS = 20
 OUTPUTS = 5
 LB = -1
 UB = 1
-MUTATION_PROB = 0.2
-SKIP_PARENTS = 1
+MUTATION_PROB = 0.4
+SKIP_PARENTS = 4
 REPLACEMENT = False
 
 if __name__ == "__main__":
@@ -90,6 +91,9 @@ if __name__ == "__main__":
         multiplemode = "yes"
 
     algorithm = ALGORITHMS[algorithm_name]
+
+    if len(parser.enemies) == 0:
+        sys.exit("Zero enemies is not possible")
 
     # all neceassary GA input for tuning
     params = [

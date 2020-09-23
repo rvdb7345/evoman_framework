@@ -100,7 +100,7 @@ def set_arguments():
         "-enemies",
         type=int,
         action="append",
-        default=[8],
+        default=[],
         help="enemies against GA will be applied (can be multiple enemies)\n" \
             "(default=[8])"
     )
