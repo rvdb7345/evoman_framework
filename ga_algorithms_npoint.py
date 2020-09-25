@@ -629,6 +629,8 @@ class GA_random_weightedNpoint_adapt(GA_random_Npoint):
         """
         fit_norm_reversed = [fit_norm[self.pop_size - i - 1] for i, _ in enumerate(fit_norm)]
 
+        print(fit_norm_reversed)
+
         if not self.replacement:
 
             # first select parents
@@ -754,7 +756,7 @@ class GA_random_weightedNpoint_adapt(GA_random_Npoint):
 
         # select parents based on normilzed probabilites of the fitnesses who
         # do not survive
-        sorted_controls = self.determine_survival(fit_norm_sorted, sorted_controls, children)
+        sorted_controls = self.determine_survival(children, fit_norm_sorted, sorted_controls)
 
         return sorted_controls
         

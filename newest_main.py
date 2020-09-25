@@ -108,6 +108,8 @@ if __name__ == "__main__":
         gridsearch_linearNpoint(algorithm, filename, *params)
         sys.exit("Tuning went succesfull")
 
+    print(parser.enemies)
+
     # initialize algorithm
     GA = algorithm(
         name=experiment_name,
