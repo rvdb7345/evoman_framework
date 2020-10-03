@@ -25,7 +25,10 @@ class MonteCarlo(object):
         self.save_output = save_output
         self.results_folder = os.path.join("results", self.name)
 
-        os.makedirs(self.results_folder, exist_ok=True)
+        # remove old data if exists
+        if os.path.exists(self.results_folder):
+            os.rmdir(self.results_folder)
+        os.makedirs(self.results_folder)
 
     def save_stats(self, sim, fitnesses, diversity_gens):
         """
