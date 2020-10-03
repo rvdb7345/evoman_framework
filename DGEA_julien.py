@@ -235,14 +235,15 @@ class DGEA(object):
         # start evolutionary algorithm
         for gen in processbar(range(1, self.total_generations + 1)):
             if diversity < self.dmin:
-                if mode == "Exploit":
-                    self.calc_clustering(population, gen)
-
                 mode = "Explore"
-                population = self.mutation(population)
-                total_explore += 1
+                self.calc_clustering(population, gen)
             elif diversity > self.dmax:
                 mode = "Exploit"
+
+            if mode == "Explore":
+                population = self.mutation(population)
+                total_explore += 1
+            elif mode == "Exploit":
                 if np.random.uniform() < self.crossover_prob:
                     population = self.crossover(population, fitnesses)
                 total_exploit += 1

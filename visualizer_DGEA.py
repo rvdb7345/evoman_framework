@@ -60,3 +60,5 @@ class Visualizer(object):
 
 if __name__ == "__main__":
     visualizer = Visualizer("dgea_robin", "fitnesses_e7e8.csv", "diversity_e7e8.csv")
+    # visualizer = Visualizer("dgea_test", "fitnesses_e7e8.csv", "diversity_e7e8.csv")
+    visualizer = Visualizer("dgea_test_bigger", "fitnesses_e7e8.csv", "diversity_e7e8.csv")
