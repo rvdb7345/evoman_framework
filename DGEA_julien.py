@@ -253,32 +253,3 @@ class DGEA(object):
         self.fitnesses, self.diversity_gens = [], []
         self.best_fit, self.best_sol = None, None
         self.best_sols, self.not_improved = [], 0
-    
-if __name__ == "__main__":
-    from helpers_DGEA import collect_parameters
-    params = collect_parameters("parameters_dgea.txt")
-    GA = DGEA("test", params)
-    fitnesses, diversities, best_fit, best_sol, total_exploit, total_explore = GA.run()
-
-    # # plot simple errorbar for mean fitness
-    # plt.figure()
-    # plt.title("Mean fitness per generation")
-    # plt.errorbar(np.arange(0, GA.total_generations + 1), GA.mean_fitness_gens, yerr=GA.stds_fitness_gens)
-    # plt.grid()
-    # plt.xlabel("Generation (#)")
-    # plt.ylabel("Mean fitness")
-    # plt.show()
-
-    # # plot diversity over generations
-    # plt.figure()
-    # plt.title("diversity")
-    # plt.plot(GA.diversity_gens)
-    # plt.grid()
-    # plt.ylabel("diversity")
-    # plt.xlabel("generation")
-    # plt.show()
-
-    # print("Final population solution has an average fitness of: {}".format(GA.mean_fitness_gens[GA.total_generations - 1]))
-    print("Best fitness found is: {}".format(GA.best_fit))
-    print("Total exploit is {}".format(total_exploit))
-    print("Total explore is {}".format(total_explore))

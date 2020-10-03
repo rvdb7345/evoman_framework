@@ -38,7 +38,7 @@ class MonteCarlo(object):
         filename = os.path.join(self.results_folder, csv_fitnesses)
         df_fitnesses = pd.DataFrame(fitnesses)
         if os.path.exists(filename):
-            df_fitnesses.to_csv(filename, mode='a')
+            df_fitnesses.to_csv(filename, mode='a', header=False)
         else:
             df_fitnesses.to_csv(filename, mode='w')
 
@@ -46,7 +46,7 @@ class MonteCarlo(object):
         filename = os.path.join(self.results_folder, csv_diversity)
         df_diversity = pd.DataFrame(diversity_gens)
         if os.path.exists(filename):
-            df_diversity.to_csv(filename, mode='a')
+            df_diversity.to_csv(filename, mode='a', header=False)
         else:
             df_diversity.to_csv(filename, mode="w")
 

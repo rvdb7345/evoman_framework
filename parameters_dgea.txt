@@ -9,4 +9,4 @@ crossover_prob=0.9
 dmin=0.000005
 dmax=0.067
 fraction_replace=1
-N=1
+N=2
