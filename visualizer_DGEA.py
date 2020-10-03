@@ -6,7 +6,7 @@ A script to visualize the data collected by the Monte Carlo simulations
 
 Created on Thursday Sep 17 2020
 This code was implemented by
-Julien Fer, ...., ...., ....
+Julien Fer, Robin van den Berg, ...., ....
 """
 
 import os
@@ -39,6 +39,8 @@ class Visualizer(object):
         generations = list(range(0, len(mean_fitnesses)))
         plt.plot(generations, mean_fitnesses, color="b")
         plt.fill_between(generations, lower_ci, upper_ci, color="blue", alpha=0.1)
+        plt.xlabel('Generation (#)', fontsize=12)
+        plt.ylabel('Fitness', fontsize=12)
         plt.show()
 
         # determine mean diversity per generation
@@ -51,8 +53,10 @@ class Visualizer(object):
         plt.figure()
         plt.plot(generations, mean_diversity, color="b")
         plt.fill_between(generations, lower_ci, upper_ci, color="blue", alpha=0.1)
+        plt.xlabel('Generation (#)', fontsize=12)
+        plt.ylabel('Diversity', fontsize=12)
         plt.show()
 
 
 if __name__ == "__main__":
-    visualizer = Visualizer("dgea_test", "fitnesses_e7e8.csv", "diversity_e7e8.csv")
+    visualizer = Visualizer("dgea_robin", "fitnesses_e7e8.csv", "diversity_e7e8.csv")

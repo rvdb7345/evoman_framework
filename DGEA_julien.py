@@ -20,6 +20,7 @@ from tqdm import tqdm as processbar
 # import custom module (others)
 from environment import Environment
 from demo_controller import player_controller
+from sklearn.cluster import KMeans
 
 class DGEA(object):
     """
@@ -127,6 +128,7 @@ class DGEA(object):
         average_vec = np.mean(population, axis=0)
         scale_factors = np.ones(len(population[0])) * self.mutation_frac
         stds_gaussian = abs(self.upper_bound - self.lower_bound) / 2
+        # stds_gaussian = abs(self.upper_bound - self.lower_bound) / 2 * 1/np.random.uniform()
 
         for individual in population:
             if np.random.uniform() < self.mutation_prob:
@@ -169,6 +171,20 @@ class DGEA(object):
         #     self.not_improved += 1
         else:
             self.not_improved += 1
+
+    def calc_clustering(self, population, gen):
+        inertias = []
+        clusters = np.arange(2, len(population))
+        for i in clusters:
+              kmeans = KMeans(n_clusters=i, random_state=0, n_jobs=-1).fit(population)
+              inertias.append(kmeans.inertia_)
+
+        plt.figure()
+        plt.plot(clusters, inertias)
+        plt.xlabel('clusters (#)')
+        plt.ylabel('Inertia')
+        plt.title('Kmeans clustering of the population')
+        plt.savefig('kmeans_clustering_gen' + str(gen) + '.png', dpi=300)
     
     def run(self, curr_sim):
         """
@@ -195,7 +211,7 @@ class DGEA(object):
         self.n_vars = (env.get_num_sensors() + 1) * self.n_hidden_neurons + (self.n_hidden_neurons + 1) * 5
 
         # determine diagonal of search space (not sure if correct)
-        self.L = math.sqrt(self.n_vars * 2 ** 2)
+        self.L = math.sqrt(self.n_vars * (self.upper_bound - self.lower_bound) ** 2)
 
         # create initial random population
         population = np.random.uniform(self.lower_bound, self.upper_bound, (self.pop_size, self.n_vars))
@@ -218,8 +234,10 @@ class DGEA(object):
 
         # start evolutionary algorithm
         for gen in processbar(range(1, self.total_generations + 1)):
-            
             if diversity < self.dmin:
+                if mode == "Exploit":
+                    self.calc_clustering(population, gen)
+
                 mode = "Explore"
                 population = self.mutation(population)
                 total_explore += 1
@@ -243,6 +261,8 @@ class DGEA(object):
             fitnesses = [result[0] for result in pool_results]
             diversity = self.calc_diversity(population)
             self.update_statistics(curr_sim, gen, fitnesses, pool_input, diversity)
+
+        self.calc_clustering(population, gen)
 
         return self.fitnesses, self.diversity_gens, self.best_fit, self.best_sol, total_exploit, total_explore
 

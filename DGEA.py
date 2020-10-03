@@ -68,7 +68,7 @@ def crossover(remaining_solutions, num_to_kill_off, fitnesses_remaining):
 def mutation(population, mutation_chance):
 
     # calculate the average individual
-    average_joe = np.sum(population, axis=0)
+    average_joe = np.mean(population, axis=0)
 
     # mutate genes away from the average of the population
     for ind in population:
@@ -85,7 +85,7 @@ def calc_diversity(population):
     P = len(population)
 
     # calculate the average individual
-    average_joe = np.sum(population, axis=0)
+    average_joe = np.mean(population, axis=0)
 
 
     diversity = 0

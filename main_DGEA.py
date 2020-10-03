@@ -9,8 +9,9 @@ This code was implemented by
 Julien Fer, ...., ...., ....
 """
 
+
 # built-in modules
-import sys
+import sys, os
 
 # helper function to set command-line argument
 from helpers_DGEA import set_arguments, collect_parameters
@@ -18,6 +19,8 @@ from helpers_DGEA import set_arguments, collect_parameters
 # import genetic alorithms (GA) and monte carlo
 from DGEA_julien import DGEA
 from monte_carlo_DGEA import MonteCarlo
+
+os.environ["SDL_VIDEODRIVER"] = "dummy"
 
 if __name__ == "__main__":
     
