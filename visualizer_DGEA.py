@@ -11,6 +11,7 @@ Julien Fer, ...., ...., ....
 
 import os
 import pandas as pd
+from matplotlib import pyplot as plt
 
 class Visualizer(object):
     """
@@ -18,16 +19,40 @@ class Visualizer(object):
     """
     def __init__(self, name, csv_fitnesses_EA, csv_diversity_EA):
         self.results_EA = os.path.join("results", name)
-        self.load_stats_EA(csv_fitnesses_EA, csv_diversity_EA)
-
-    def load_stats_EA(self, csv_fitnesses_EA, csv_diversity_EA):
-        """
-        Load the statistics collected from evolutionary runs.
-        """
         self.pd_fits_EA = pd.read_csv(os.path.join(self.results_EA, csv_fitnesses_EA))
         self.pd_div_EA = pd.read_csv(os.path.join(self.results_EA, csv_diversity_EA))
-        print(self.pd_fits_EA)
-        print(self.pd_div_EA)
+        self.plot_fits_EA()
+
+    def plot_fits_EA(self):
+        """
+        Plots mean fits EA across the generations with its confidence interval
+        """
+
+        # first determine mean fitness per generation
+        mean_fitnesses = self.pd_fits_EA.groupby("generation")["fitness"].mean()
+        stds_fitnesses = self.pd_fits_EA.groupby("generation")["fitness"].std()
+        lower_ci = mean_fitnesses - stds_fitnesses
+        upper_ci = mean_fitnesses + stds_fitnesses
+
+        # plot mean fitness across the generations
+        plt.figure()
+        generations = list(range(0, len(mean_fitnesses)))
+        plt.plot(generations, mean_fitnesses, color="b")
+        plt.fill_between(generations, lower_ci, upper_ci, color="blue", alpha=0.1)
+        plt.show()
+
+        # determine mean diversity per generation
+        mean_diversity = self.pd_div_EA.groupby("generation")["diversity"].mean()
+        stds_diversity = self.pd_div_EA.groupby("generation")["diversity"].std()
+        lower_ci = mean_diversity - stds_diversity
+        upper_ci = mean_diversity + stds_diversity
+
+        # plot mean diversity across the generations
+        plt.figure()
+        plt.plot(generations, mean_diversity, color="b")
+        plt.fill_between(generations, lower_ci, upper_ci, color="blue", alpha=0.1)
+        plt.show()
+
 
 if __name__ == "__main__":
     visualizer = Visualizer("dgea_test", "fitnesses_e7e8.csv", "diversity_e7e8.csv")
