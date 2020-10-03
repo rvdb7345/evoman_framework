@@ -39,8 +39,9 @@ class Visualizer(object):
         generations = list(range(0, len(mean_fitnesses)))
         plt.plot(generations, mean_fitnesses, color="b")
         plt.fill_between(generations, lower_ci, upper_ci, color="blue", alpha=0.1)
-        plt.xlabel('Generation (#)', fontsize=12)
-        plt.ylabel('Fitness', fontsize=12)
+        plt.title("Mean fitness across the generations")
+        plt.xlabel("Generation (#)", fontsize=12)
+        plt.ylabel("Fitness", fontsize=12)
         plt.show()
 
         # determine mean diversity per generation
@@ -51,6 +52,7 @@ class Visualizer(object):
 
         # plot mean diversity across the generations
         plt.figure()
+        plt.title("Mean diversity across the generations")
         plt.plot(generations, mean_diversity, color="b")
         plt.fill_between(generations, lower_ci, upper_ci, color="blue", alpha=0.1)
         plt.xlabel('Generation (#)', fontsize=12)
@@ -59,6 +61,6 @@ class Visualizer(object):
 
 
 if __name__ == "__main__":
-    visualizer = Visualizer("dgea_robin", "fitnesses_e7e8.csv", "diversity_e7e8.csv")
-    # visualizer = Visualizer("dgea_test", "fitnesses_e7e8.csv", "diversity_e7e8.csv")
-    visualizer = Visualizer("dgea_test_bigger", "fitnesses_e7e8.csv", "diversity_e7e8.csv")
+    # visualizer = Visualizer("dgea_robin", "fitnesses_e7e8.csv", "diversity_e7e8.csv")
+    visualizer = Visualizer("dgea_test", "fitnesses_e7e8.csv", "diversity_e7e8.csv")
+    # visualizer = Visualizer("dgea_test_bigger", "fitnesses_e7e8.csv", "diversity_e7e8.csv")
