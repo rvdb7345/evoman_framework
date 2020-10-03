@@ -10,6 +10,7 @@ Julien Fer, ...., ...., ....
 """
 
 import os
+import shutil
 import pandas as pd
 
 class MonteCarlo(object):
@@ -27,7 +28,7 @@ class MonteCarlo(object):
 
         # remove old data if exists
         if os.path.exists(self.results_folder):
-            os.rmdir(self.results_folder)
+            shutil.rmtree(self.results_folder)
         os.makedirs(self.results_folder)
 
     def save_stats(self, sim, fitnesses, diversity_gens):
@@ -41,17 +42,17 @@ class MonteCarlo(object):
         filename = os.path.join(self.results_folder, csv_fitnesses)
         df_fitnesses = pd.DataFrame(fitnesses)
         if os.path.exists(filename):
-            df_fitnesses.to_csv(filename, mode='a', header=False)
+            df_fitnesses.to_csv(filename, mode='a', header=False, index=False)
         else:
-            df_fitnesses.to_csv(filename, mode='w')
+            df_fitnesses.to_csv(filename, mode='w', index=False)
 
         csv_diversity = "diversity_" + enemies_str + ".csv"
         filename = os.path.join(self.results_folder, csv_diversity)
         df_diversity = pd.DataFrame(diversity_gens)
         if os.path.exists(filename):
-            df_diversity.to_csv(filename, mode='a', header=False)
+            df_diversity.to_csv(filename, mode='a', header=False, index=False)
         else:
-            df_diversity.to_csv(filename, mode="w")
+            df_diversity.to_csv(filename, mode="w", index=False)
 
     def run(self):
         """
@@ -66,10 +67,6 @@ class MonteCarlo(object):
             # save statistics
             if self.save_output:
                 self.save_stats(n, fitnesses, diversities)
-
-            # # show simple error plot
-            # if self.show_plot:
-            #     self.GA.simple_errorbar()
 
             # reset EA
             self.GA.reset_algorithm()
