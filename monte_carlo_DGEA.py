@@ -13,6 +13,8 @@ import os
 import shutil
 import pandas as pd
 
+from visualizer_DGEA import Visualizer
+
 class MonteCarlo(object):
     """
     OOP representation to run N simulations of a certain GA in the EvoMan
@@ -26,10 +28,11 @@ class MonteCarlo(object):
         self.save_output = save_output
         self.results_folder = os.path.join("results", self.name)
 
-        # remove old data if exists
-        if os.path.exists(self.results_folder):
+        # remove old data if exists, and make sure a (new) results folder exists
+        if os.path.exists(self.results_folder) and save_output:
             shutil.rmtree(self.results_folder)
-        os.makedirs(self.results_folder)
+        if save_output:
+            os.makedirs(self.results_folder, exist_ok=True)
 
     def save_stats(self, sim, fitnesses, diversity_gens):
         """
@@ -70,3 +73,6 @@ class MonteCarlo(object):
 
             # reset EA
             self.GA.reset_algorithm()
+
+        # if self.show_plot:
+        #     Visualizer()
