@@ -19,6 +19,8 @@ from helpers_DGEA import set_arguments, collect_parameters
 from DGEA_julien import DGEA
 from monte_carlo_DGEA import MonteCarlo
 
+ALGORITHMS = {"dgea": DGEA}
+
 if __name__ == "__main__":
     
     # get command-line arguments, set experiment name and filename parameters
@@ -28,6 +30,7 @@ if __name__ == "__main__":
 
     parameters = collect_parameters(filename)
 
-    algorithm = DGEA(parser.name, parameters, parser.enemies)
-    MC = MonteCarlo(experiment_name, algorithm, parameters["N"], parser.show_plot, parser.save_output)
+    algorithm = ALGORITHMS[parser.algorithm]
+    GA = algorithm(parser.algorithm, parameters, parser.enemies)
+    MC = MonteCarlo(experiment_name, GA, parameters["N"], parser.show_plot, parser.save_output)
     MC.run()

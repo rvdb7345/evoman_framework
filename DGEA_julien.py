@@ -10,7 +10,6 @@ sys.path.insert(0, 'evoman')
 
 # import built-in packages
 import math
-import random
 from multiprocessing import Pool, cpu_count
 
 # import third parties packages
@@ -37,19 +36,14 @@ class DGEA(object):
         self.lower_bound, self.upper_bound = parameters["lb"], parameters["ub"]
         self.pop_size, self.total_generations = parameters["pop_size"], parameters["total_generations"]
         self.mutation_prob = parameters["mutation_prob"]
+        self.mutation_frac = parameters["mutation_factor"] * abs(self.upper_bound - self.lower_bound)
         self.crossover_prob = parameters["crossover_prob"]
         self.dmin, self.dmax = parameters["dmin"], parameters["dmax"]
         self.fraction_replace = parameters["fraction_replace"]
         self.enemies = enemies
 
         # initialize tracking variables for statistics of simulation
-        self.mean_fitness_gens = np.zeros(self.total_generations + 1)
-        self.stds_fitness_gens = np.zeros(self.total_generations + 1)
-        self.mean_p_lifes_gens = np.zeros(self.total_generations + 1)
-        self.stds_p_lifes_gens = np.zeros(self.total_generations + 1)
-        self.mean_e_lifes_gens = np.zeros(self.total_generations + 1)
-        self.stds_e_lifes_gens = np.zeros(self.total_generations + 1)
-        self.diversity_gens = np.zeros(self.total_generations + 1)
+        self.fitnesses, self.diversity_gens = [], []
         self.best_fit, self.best_sol = None, None
         self.best_sols, self.not_improved = [], 0
 
@@ -88,20 +82,20 @@ class DGEA(object):
         """
         Performs Binary tournament.
         """
-        idx1 = np.random.randint(0, population.shape[0], 1)
-        idx2 = np.random.randint(0, population.shape[0], 1)
+        idx1 = np.random.randint(0, population.shape[0])
+        idx2 = np.random.randint(0, population.shape[0])
         
         if fitnesses[idx1] > fitnesses[idx2]:
             return population[idx1]
 
-        return fitnesses[idx2]
+        return population[idx2]
 
     def crossover(self, population, fitnesses):
         """
         Performs hybrid crossover: uniform crossover and arithmetic crossover
         The uniform crossover randomly divides weights of 0 and 1 to the weights
         of the neurons. This is done for n-1 weights. The last one is drawn from
-        a unifrom distribution.
+        a unifrom distribution. The weights are reversed for the second child.
         """
         nr_children = int(population.shape[0] * self.fraction_replace)
         all_offsprings = np.zeros((0, self.n_vars))
@@ -120,27 +114,43 @@ class DGEA(object):
             # perform crossover
             offspring1 = weights * parent1 + (1 - weights) * parent2
             offspring2 = (1 - weights) * parent1 + weights * parent2
-            np.vstack((all_offsprings, offspring1)), np.vstack((all_offsprings, offspring2))
+            all_offsprings = np.vstack((all_offsprings, offspring1))
+            all_offsprings = np.vstack((all_offsprings, offspring2))
 
         return all_offsprings
 
-    def update_statistics(self, gen, results, controls):
+    def mutation(self, population):
+        """
+        Gaussian mutation operator with the mean directed away from the
+        average point of the population
+        """
+        average_vec = np.mean(population, axis=0)
+        scale_factors = np.ones(len(population[0])) * self.mutation_frac
+        stds_gaussian = abs(self.upper_bound - self.lower_bound) / 2
+
+        for individual in population:
+            if np.random.uniform() < self.mutation_prob:
+                distance_vec = individual - average_vec
+                means_gaussian = np.copysign(scale_factors, distance_vec)
+                individual += np.random.normal(means_gaussian, stds_gaussian)
+            
+        return population
+
+    def update_statistics(self, curr_sim, gen, fitnesses, controls, diversity):
         """
         Update the statistics for given generation
         """
-        fitnesses, player_lifes, enemies_lifes, time = [], [], [], []
-        for result in results:
-            fitnesses.append(result[0])
-            player_lifes.append(result[1])
-            enemies_lifes.append(result[2])
-            time.append(result[3])
+        for fitness in fitnesses:
+            stats = {
+                "simulation": curr_sim,
+                "generation": gen,
+                "fitness": fitness
+            }
+            self.fitnesses.append(stats)
 
-        self.mean_fitness_gens[gen] = np.mean(fitnesses)
-        self.stds_fitness_gens[gen] = np.std(fitnesses)
-        self.mean_p_lifes_gens[gen] = np.mean(player_lifes)
-        self.stds_p_lifes_gens[gen] = np.std(player_lifes)
-        self.mean_e_lifes_gens[gen] = np.mean(enemies_lifes)
-        self.stds_e_lifes_gens[gen] = np.std(enemies_lifes)
+        self.diversity_gens.append(
+            {"simulation": curr_sim, "generation": gen, "diversity": diversity}
+        )
 
         best_fit_gen = max(fitnesses)
         if self.best_fit is None or best_fit_gen > self.best_fit:
@@ -150,16 +160,17 @@ class DGEA(object):
             self.best_sols = [self.best_sol]
             self.not_improved = 0
 
+        # THIS FIRST NEED TO BE DISCUSSED BEFORE WE IMPLEMENT IT
         # we also should add a the diversity measure here cause otherwise 
         # we will save a lot of duplicate controllers with the same score instead
         # of different controllers with the same score
-        elif best_fit_gen == self.best_fit:
-            self.best_sols.append(controls[fitnesses.index(best_fit_gen)])
-            self.not_improved += 1
+        # elif best_fit_gen == self.best_fit:
+        #     self.best_sols.append(controls[fitnesses.index(best_fit_gen)])
+        #     self.not_improved += 1
         else:
             self.not_improved += 1
     
-    def run(self):
+    def run(self, curr_sim):
         """
         Run evolutionary algorithm
         """
@@ -177,16 +188,17 @@ class DGEA(object):
             logs="off"
         )
 
-        env.state_to_log()  # checks environment state
+        # checks environment state
+        env.state_to_log()
 
         # number of variables for neural network with one hidden layer
         self.n_vars = (env.get_num_sensors() + 1) * self.n_hidden_neurons + (self.n_hidden_neurons + 1) * 5
 
-        # determine diagonal of search space (NOT SURE IF CORRECT)
-        self.L = self.n_vars * 2 ** 2 ** 0.5
+        # determine diagonal of search space (not sure if correct)
+        self.L = math.sqrt(self.n_vars * 2 ** 2)
 
-        # create random population
-        population = np.random.uniform(self.lower_bound, self.upper_bound, (self.pop_size, n_vars))
+        # create initial random population
+        population = np.random.uniform(self.lower_bound, self.upper_bound, (self.pop_size, self.n_vars))
 
         # run initial population
         pool = Pool(cpu_count())
@@ -196,11 +208,77 @@ class DGEA(object):
         pool.join()
         
         # save results inital solution
-        self.update_statistics(0, pool_results, pool_input)
+        fitnesses = [result[0] for result in pool_results]
+        diversity = self.calc_diversity(population)
+        self.update_statistics(curr_sim, 0, fitnesses, pool_input, diversity)
+
+        # initial mode dgea algorithm 
+        mode = "Exploit"
+        total_exploit, total_explore = 0, 0
 
         # start evolutionary algorithm
-        for gen in range(1, self.total_generations):
-            pass
+        for gen in processbar(range(1, self.total_generations + 1)):
+            
+            if diversity < self.dmin:
+                mode = "Explore"
+                population = self.mutation(population)
+                total_explore += 1
+            elif diversity > self.dmax:
+                mode = "Exploit"
+                if np.random.uniform() < self.crossover_prob:
+                    population = self.crossover(population, fitnesses)
+                total_exploit += 1
 
+            # make sure weights neural network are within borders
+            population = np.clip(population, self.lower_bound, self.upper_bound)
+
+            # run new population
+            pool = Pool(cpu_count())
+            pool_input = [sol for sol in population]
+            pool_results = pool.map(self.play_game, pool_input)
+            pool.close()
+            pool.join()
+            
+            # save results inital solution
+            fitnesses = [result[0] for result in pool_results]
+            diversity = self.calc_diversity(population)
+            self.update_statistics(curr_sim, gen, fitnesses, pool_input, diversity)
+
+        return self.fitnesses, self.diversity_gens, self.best_fit, self.best_sol, total_exploit, total_explore
+
+    def reset_algorithm(self):
+        """
+        Resets algorithm so a new run can be performed
+        """
+        self.fitnesses, self.diversity_gens = [], []
+        self.best_fit, self.best_sol = None, None
+        self.best_sols, self.not_improved = [], 0
+    
 if __name__ == "__main__":
-    print("Hello world")
+    from helpers_DGEA import collect_parameters
+    params = collect_parameters("parameters_dgea.txt")
+    GA = DGEA("test", params)
+    fitnesses, diversities, best_fit, best_sol, total_exploit, total_explore = GA.run()
+
+    # # plot simple errorbar for mean fitness
+    # plt.figure()
+    # plt.title("Mean fitness per generation")
+    # plt.errorbar(np.arange(0, GA.total_generations + 1), GA.mean_fitness_gens, yerr=GA.stds_fitness_gens)
+    # plt.grid()
+    # plt.xlabel("Generation (#)")
+    # plt.ylabel("Mean fitness")
+    # plt.show()
+
+    # # plot diversity over generations
+    # plt.figure()
+    # plt.title("diversity")
+    # plt.plot(GA.diversity_gens)
+    # plt.grid()
+    # plt.ylabel("diversity")
+    # plt.xlabel("generation")
+    # plt.show()
+
+    # print("Final population solution has an average fitness of: {}".format(GA.mean_fitness_gens[GA.total_generations - 1]))
+    print("Best fitness found is: {}".format(GA.best_fit))
+    print("Total exploit is {}".format(total_exploit))
+    print("Total explore is {}".format(total_explore))

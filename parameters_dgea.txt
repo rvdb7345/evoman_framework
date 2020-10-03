@@ -1,9 +1,10 @@
 neurons=10
 lb=-1
 ub=1
-pop_size=10
-total_generations=6
+pop_size=8
+total_generations=5
 mutation_prob=0.75
+mutation_factor=0.2
 crossover_prob=0.9
 dmin=0.000005
 dmax=0.067
