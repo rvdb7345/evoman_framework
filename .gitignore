@@ -13,3 +13,9 @@ __pycache__/
 
 #  Ignore CSV files
 *.csv
+
+# Ignore txt file such as the parameters files to prevent merge conflicts
+*.txt
+
+# Ignore png files to prevent merge conflicts with saved plots
+*.png
