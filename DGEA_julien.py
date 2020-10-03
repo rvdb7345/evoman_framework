@@ -165,7 +165,7 @@ class DGEA(object):
         # THIS FIRST NEED TO BE DISCUSSED BEFORE WE IMPLEMENT IT
         # we also should add a the diversity measure here cause otherwise 
         # we will save a lot of duplicate controllers with the same score instead
-        # of different controllers with the same score
+        # of different controllers with the (almost the?) same score
         # elif best_fit_gen == self.best_fit:
         #     self.best_sols.append(controls[fitnesses.index(best_fit_gen)])
         #     self.not_improved += 1
@@ -235,8 +235,9 @@ class DGEA(object):
         # start evolutionary algorithm
         for gen in processbar(range(1, self.total_generations + 1)):
             if diversity < self.dmin:
+                if mode == "Exploit":
+                    self.calc_clustering(population, gen)
                 mode = "Explore"
-                self.calc_clustering(population, gen)
             elif diversity > self.dmax:
                 mode = "Exploit"
 
