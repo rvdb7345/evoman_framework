@@ -19,3 +19,7 @@ __pycache__/
 
 # Ignore png files to prevent merge conflicts with saved plots
 *.png
+
+# ignore numpy save files
+*.npy
+*.npz

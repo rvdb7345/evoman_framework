@@ -34,6 +34,15 @@ class BasicGA(object):
         self.total_generations = total_generations
         self.enemies = enemies
         self.save_output = save_output
+        self.mutation_prob = 0.2
+
+        # search intervals for parameters
+        self.ranges_dmin = [[0, 0.15], [0.15, 0.30]]
+        self.ranges_dmax = [0.5, 1]
+        self.ranges_mutation_factor = [[0, 0.15], [0.15, 0.30]]
+        self.individual_per_interval = 1
+
+        # attributes to keep track of best fits and its corresponding parameters
         self.data = []
         self.best_fits, self.best_combos = [], []
 
@@ -41,7 +50,7 @@ class BasicGA(object):
         enemies_str = ""
         for enemy in self.enemies:
             enemies_str += "e" + str(enemy)
-        self.csv_fitnesses = "best_fits" + enemies_str + ".csv"
+        self.csv_fitnesses = "best_fits_" + enemies_str + ".csv"
 
     def make_initial_population(self):
         """
@@ -49,12 +58,9 @@ class BasicGA(object):
         tries to "equally" distributed the parameters combinations
         """
         # set up initial "search spaces" for better distributed sampling
-        ranges_dmin = [[0, 0.15], [0.15, 0.30]]
-        ranges_dmax = [0.5, 1]
-        len_ranges_div = len(ranges_dmin)
-        ranges_mutation_factor = [[0, 0.15], [0.15, 0.30]]
-        len_ranges_mutation = len(ranges_mutation_factor)
-        total_combos = 1 * (len_ranges_div + len_ranges_mutation)
+        len_ranges_div = len(self.ranges_dmin)
+        len_ranges_mutation = len(self.ranges_mutation_factor)
+        total_combos = self.individual_per_interval * (len_ranges_div + len_ranges_mutation)
 
         # semi-randomly sample initial (dmin, dmax, mutation factor) population
         population = np.zeros((total_combos, 3))
@@ -62,15 +68,15 @@ class BasicGA(object):
 
             # sample (dmin, dmax)
             idx_dmin = i % len_ranges_div
-            dmin_lb, dmin_ub = ranges_dmin[idx_dmin]
+            dmin_lb, dmin_ub = self.ranges_dmin[idx_dmin]
             dmin = np.random.uniform(dmin_lb, dmin_ub)
-            dmax_ub = ranges_dmax[idx_dmin]
+            dmax_ub = self.ranges_dmax[idx_dmin]
             dmax = np.random.uniform(dmin + 1e-5, dmax_ub)
             population[i, 0], population[i, 1] = dmin, dmax
 
             # sample mutation factor
             idx_mutation = i % len_ranges_mutation
-            fact_lb, fact_ub = ranges_mutation_factor[idx_mutation]
+            fact_lb, fact_ub = self.ranges_mutation_factor[idx_mutation]
             mutation_fact = np.random.uniform(fact_lb, fact_ub)
             population[i, 2] = mutation_fact
 
@@ -141,7 +147,18 @@ class BasicGA(object):
             parent2 = self.tournament(population, scores)
             weigth = np.random.uniform()
             child = (1 - weigth) * parent1 + weigth * parent2
-            
+
+            # mutation
+            if np.random.uniform() < self.mutation_prob:
+                child += np.random.normal()
+
+            # make sure variables represent probalities (range 0-1)
+            for value in child:
+                if value > 1:
+                    value = 0.9999999
+                elif value < 0:
+                    value = 0.0000001
+
             # make sure dmin is smaller than dmax
             if child[0] > child[1]:
                 temp = child[0]
@@ -196,9 +213,9 @@ class BasicGA(object):
             # make offspring, evaluate and keep track of data
             offspring = self.crossover(population, scores)
             scores_offspring = self.play(offspring, gen)
+            self.update_data(gen, offspring, scores_offspring)
             population = np.vstack((population, offspring))
             scores = np.append(scores, scores_offspring)
-            self.update_data(gen, population, scores)
 
             # best score and best combo
             best_score_idx = np.argmax(scores)
@@ -208,7 +225,7 @@ class BasicGA(object):
             norm_scores = self.normalise_scores(scores)
             probs = norm_scores / norm_scores.sum()
             chosen = np.random.choice(population.shape[0], pop_size, p=probs, replace=False)
-            chosen = np.append(chosen[1, :], best_score_idx)
+            chosen = np.append(chosen[1:], best_score_idx)
             population = population[chosen]
             scores = scores[chosen]
 
