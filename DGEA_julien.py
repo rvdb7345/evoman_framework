@@ -33,6 +33,7 @@ class DGEA(object):
             enemies=[7, 8]
         ):
         self.name = name
+        self.results_folder = os.path.join("results", name)
         self.n_hidden_neurons = parameters["neurons"]
         self.lower_bound, self.upper_bound = parameters["lb"], parameters["ub"]
         self.pop_size, self.total_generations = parameters["pop_size"], parameters["total_generations"]
@@ -41,10 +42,11 @@ class DGEA(object):
         self.crossover_prob = parameters["crossover_prob"]
         self.dmin, self.dmax = parameters["dmin"], parameters["dmax"]
         self.fraction_replace = parameters["fraction_replace"]
+        self.max_no_improvements = parameters["max_no_improvements"]
         self.enemies = enemies
 
         # initialize tracking variables for statistics of simulation
-        self.fitnesses, self.diversity_gens = [], []
+        self.fitnesses, self.best_fit_gens, self.diversity_gens = [], [], []
         self.best_fit, self.best_sol = None, None
         self.best_sols, self.not_improved = [], 0
 
@@ -77,7 +79,7 @@ class DGEA(object):
         for individual in population:
             diversity += np.linalg.norm(individual - average_vec)
 
-        return (1 / (abs(self.L) + self.pop_size)) * diversity
+        return (1 / (abs(self.L) * self.pop_size)) * diversity
 
     def tournament(self, population, fitnesses):
         """
@@ -150,6 +152,9 @@ class DGEA(object):
             }
             self.fitnesses.append(stats)
 
+        self.best_fit_gens.append(
+            {"simulation": curr_sim, "generation": gen, "best fit": self.best_fit}
+        )
         self.diversity_gens.append(
             {"simulation": curr_sim, "generation": gen, "diversity": diversity}
         )
@@ -169,22 +174,29 @@ class DGEA(object):
         # elif best_fit_gen == self.best_fit:
         #     self.best_sols.append(controls[fitnesses.index(best_fit_gen)])
         #     self.not_improved += 1
-        else:
+
+        # Only keep track of no improvements if we diversity is low (Explore fase)
+        elif self.mode == "Explore":
             self.not_improved += 1
 
-    def calc_clustering(self, population, gen):
+    def calc_clustering(self, population, curr_sim, gen):
         inertias = []
         clusters = np.arange(2, len(population))
         for i in clusters:
               kmeans = KMeans(n_clusters=i, random_state=0, n_jobs=-1).fit(population)
               inertias.append(kmeans.inertia_)
 
+        enemies_str = ""
+        for enemy in self.enemies:
+            enemies_str += "e" + str(enemy)
+        filename = "kmeans_clustering_sim" + str(curr_sim) + "_gen" + str(gen) + ".png"
+        path = os.path.join(self.results_folder, filename)
         plt.figure()
         plt.plot(clusters, inertias)
         plt.xlabel('clusters (#)')
         plt.ylabel('Inertia')
         plt.title('Kmeans clustering of the population')
-        plt.savefig('kmeans_clustering_gen' + str(gen) + '.png', dpi=300)
+        plt.savefig(path, dpi=300)
     
     def run(self, curr_sim):
         """
@@ -216,6 +228,13 @@ class DGEA(object):
         # create initial random population
         population = np.random.uniform(self.lower_bound, self.upper_bound, (self.pop_size, self.n_vars))
 
+        # initial mode dgea algorithm 
+        gen, self.mode = 0, "Exploit"
+        total_exploit, total_explore = 0, 0
+
+        # initalize processbar
+        pbar = processbar(total=self.total_generations)
+
         # run initial population
         pool = Pool(cpu_count())
         pool_input = [sol for sol in population]
@@ -226,25 +245,25 @@ class DGEA(object):
         # save results inital solution
         fitnesses = [result[0] for result in pool_results]
         diversity = self.calc_diversity(population)
-        self.update_statistics(curr_sim, 0, fitnesses, pool_input, diversity)
+        self.update_statistics(curr_sim, gen, fitnesses, pool_input, diversity)
 
-        # initial mode dgea algorithm 
-        mode = "Exploit"
-        total_exploit, total_explore = 0, 0
+        pbar.update(1)
 
         # start evolutionary algorithm
-        for gen in processbar(range(1, self.total_generations + 1)):
+        # for gen in processbar(range(1, self.total_generations + 1)):
+        while gen < self.total_generations + 1 and self.not_improved < self.max_no_improvements:
+            gen += 1
             if diversity < self.dmin:
-                if mode == "Exploit":
-                    self.calc_clustering(population, gen)
-                mode = "Explore"
+                if self.mode == "Exploit":
+                    self.calc_clustering(population, curr_sim, gen)
+                self.mode = "Explore"
             elif diversity > self.dmax:
-                mode = "Exploit"
+                self.mode = "Exploit"
 
-            if mode == "Explore":
+            if self.mode == "Explore":
                 population = self.mutation(population)
                 total_explore += 1
-            elif mode == "Exploit":
+            elif self.mode == "Exploit":
                 if np.random.uniform() < self.crossover_prob:
                     population = self.crossover(population, fitnesses)
                 total_exploit += 1
@@ -264,9 +283,11 @@ class DGEA(object):
             diversity = self.calc_diversity(population)
             self.update_statistics(curr_sim, gen, fitnesses, pool_input, diversity)
 
-        self.calc_clustering(population, gen)
+            pbar.update(1)
 
-        return self.fitnesses, self.diversity_gens, self.best_fit, self.best_sol, total_exploit, total_explore
+        self.calc_clustering(population, curr_sim, gen)
+
+        return self.fitnesses, self.best_fit_gens, self.diversity_gens, self.best_fit, self.best_sol, total_exploit, total_explore
 
     def reset_algorithm(self):
         """

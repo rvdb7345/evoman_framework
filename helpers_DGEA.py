@@ -57,6 +57,12 @@ def set_arguments():
             "(default=[])"
     )
     parser.add_argument(
+        "-tune",
+        type=str2bool,
+        default=False,
+        help="runs GA for optimizing dmin and dmax of DGEA\n(default=False)"
+    )
+    parser.add_argument(
         "-show_plot", 
         type=str2bool,
         default=False, 
