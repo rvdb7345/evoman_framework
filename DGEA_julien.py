@@ -102,9 +102,11 @@ class DGEA(object):
         """
         nr_children = int(population.shape[0] * self.fraction_replace)
         all_offsprings = np.zeros((0, self.n_vars))
+        all_offsprings = np.vstack((all_offsprings, self.best_sol))
+        child = 1
 
         # start making offspring (two for each couple of parents)
-        for child in range(0, nr_children, 2):
+        while child < nr_children:
             parent1 = self.tournament(population, fitnesses)
             parent2 = self.tournament(population, fitnesses)
 
@@ -119,6 +121,7 @@ class DGEA(object):
             offspring2 = (1 - weights) * parent1 + weights * parent2
             all_offsprings = np.vstack((all_offsprings, offspring1))
             all_offsprings = np.vstack((all_offsprings, offspring2))
+            child += 2
 
         return all_offsprings
 
