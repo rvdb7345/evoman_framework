@@ -17,7 +17,7 @@ import sys, os
 from helpers_DGEA import set_arguments, collect_parameters
 
 # import genetic alorithms (GA) and monte carlo
-from DGEA_julien import DGEA
+from DGEA_julien import DGEA, NewBlood
 from monte_carlo_DGEA import MonteCarlo
 
 # import visualizer for monte carlo results
@@ -43,6 +43,8 @@ if __name__ == "__main__":
 
     if parser.algorithm == "dgea":
         GA = DGEA(experiment_name, parameters, parser.enemies)
+    elif parser.algorithm == "newblood":
+        GA = NewBlood(experiment_name, parameters, parser.enemies)
         
     MC = MonteCarlo(experiment_name, GA, parameters["N"], parser.save_output)
     MC.run()

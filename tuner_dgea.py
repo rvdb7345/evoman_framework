@@ -56,7 +56,7 @@ class BasicGA(object):
         idx1 = np.random.randint(0, population.shape[0])
         idx2 = np.random.randint(0, population.shape[0])
 
-        if scores[idx1] > score[idx2]:
+        if scores[idx1] > scores[idx2]:
             return population[idx1]
 
         return population[idx2]
@@ -73,7 +73,7 @@ class BasicGA(object):
             parent1 = self.tournament(population, scores)
             parent2 = self.tournament(population, scores)
             weigth = np.random.uniform()
-            child = (1 - weight) * parent1 + weight * parent2
+            child = (1 - weigth) * parent1 + weigth * parent2
             
             if child[0] > child[1]:
                 temp = child[0]

@@ -6,6 +6,7 @@
 
 # imports framework
 import sys, os
+
 sys.path.insert(0, 'evoman')
 
 # import built-in packages
@@ -22,16 +23,18 @@ from environment import Environment
 from demo_controller import player_controller
 from sklearn.cluster import KMeans
 
+
 class DGEA(object):
     """
     Standard form of Diversity Guides Evolutionary Algorithm (DGEA)
     """
+
     def __init__(
             self,
             name,
             parameters,
             enemies=[7, 8]
-        ):
+    ):
         self.name = name
         self.results_folder = os.path.join("results", name)
         self.n_hidden_neurons = parameters["neurons"]
@@ -87,7 +90,7 @@ class DGEA(object):
         """
         idx1 = np.random.randint(0, population.shape[0])
         idx2 = np.random.randint(0, population.shape[0])
-        
+
         if fitnesses[idx1] > fitnesses[idx2]:
             return population[idx1]
 
@@ -112,7 +115,7 @@ class DGEA(object):
 
             # determine weights
             weights = np.zeros(self.n_vars)
-            weights[:self.n_vars - 1] = np.random.choice([0, 1], size=self.n_vars-1)
+            weights[:self.n_vars - 1] = np.random.choice([0, 1], size=self.n_vars - 1)
             weights[self.n_vars - 1] = np.random.uniform()
             np.random.shuffle(weights)
 
@@ -125,7 +128,7 @@ class DGEA(object):
 
         return all_offsprings
 
-    def mutation(self, population):
+    def mutation(self, population, fitnesses=None):
         """
         Gaussian mutation operator with the mean directed away from the
         average point of the population
@@ -140,7 +143,7 @@ class DGEA(object):
                 distance_vec = individual - average_vec
                 means_gaussian = np.copysign(scale_factors, distance_vec)
                 individual += np.random.normal(means_gaussian, stds_gaussian)
-            
+
         return population
 
     def update_statistics(self, curr_sim, gen, fitnesses, controls, diversity):
@@ -186,8 +189,8 @@ class DGEA(object):
         inertias = []
         clusters = np.arange(2, len(population))
         for i in clusters:
-              kmeans = KMeans(n_clusters=i, random_state=0, n_jobs=-1).fit(population)
-              inertias.append(kmeans.inertia_)
+            kmeans = KMeans(n_clusters=i, random_state=0, n_jobs=-1).fit(population)
+            inertias.append(kmeans.inertia_)
 
         enemies_str = ""
         for enemy in self.enemies:
@@ -200,7 +203,7 @@ class DGEA(object):
         plt.ylabel('Inertia')
         plt.title('Kmeans clustering of the population')
         plt.savefig(path, dpi=300)
-    
+
     def run(self, curr_sim):
         """
         Run evolutionary algorithm
@@ -244,7 +247,7 @@ class DGEA(object):
         pool_results = pool.map(self.play_game, pool_input)
         pool.close()
         pool.join()
-        
+
         # save results inital solution
         fitnesses = [result[0] for result in pool_results]
         diversity = self.calc_diversity(population)
@@ -264,7 +267,7 @@ class DGEA(object):
                 self.mode = "Exploit"
 
             if self.mode == "Explore":
-                population = self.mutation(population)
+                population = self.mutation(population, fitnesses)
                 total_explore += 1
             elif self.mode == "Exploit":
                 if np.random.uniform() < self.crossover_prob:
@@ -280,7 +283,7 @@ class DGEA(object):
             pool_results = pool.map(self.play_game, pool_input)
             pool.close()
             pool.join()
-            
+
             # save results inital solution
             fitnesses = [result[0] for result in pool_results]
             diversity = self.calc_diversity(population)
@@ -290,7 +293,8 @@ class DGEA(object):
 
         self.calc_clustering(population, curr_sim, gen)
 
-        return self.fitnesses, self.best_fit_gens, self.diversity_gens, self.best_fit, self.best_sol, total_exploit, total_explore
+        return self.fitnesses, self.best_fit_gens, self.diversity_gens, self.best_fit, self.best_sol, total_exploit, \
+               total_explore
 
     def reset_algorithm(self):
         """
@@ -299,3 +303,24 @@ class DGEA(object):
         self.fitnesses, self.diversity_gens = [], []
         self.best_fit, self.best_sol = None, None
         self.best_sols, self.not_improved = [], 0
+
+
+class NewBlood(DGEA):
+    def mutation(self, population, fitnesses=None):
+        '''
+        This function replaces mutation_prob of the worst individuals of the population with random individuals. This
+        was chosen to keep the number of individuals that are changed by a mutation step constant with the DGEA.
+        '''
+
+        # sort the population based on fitness and replace worst
+        sorted_fit_pop = sorted(list(zip(fitnesses, population)), key=lambda x: x[0])
+        sorted_pop = np.array([ind for _, ind in sorted_fit_pop])
+        print(sorted_pop)
+        ind_to_replace = int(self.mutation_prob * len(sorted_pop))
+        sorted_pop[0:ind_to_replace] = 0
+
+        # add new, random individuals to the population
+        new_population = np.random.uniform(self.lower_bound, self.upper_bound, (ind_to_replace, self.n_vars))
+        sorted_pop[0:ind_to_replace] = new_population
+
+        return sorted_pop

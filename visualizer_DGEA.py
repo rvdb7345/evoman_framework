@@ -66,8 +66,8 @@ class Visualizer(object):
         # determine mean max fitness per generation with confidenc intervals
         mean_best_fits = self.pd_bestfits_EA.groupby("generation")["best fit"].mean()
         stds_best_fits = self.pd_bestfits_EA.groupby("generation")["best fit"].std()
-        lower_ci_bestfits = mean_max_fits - stds_max_fits
-        upper_ci_bestfits = mean_max_fits + stds_max_fits
+        lower_ci_bestfits = mean_best_fits - stds_best_fits
+        upper_ci_bestfits = mean_best_fits + stds_best_fits
 
         # plot mean and mean max fitness across the generations
         plt.figure()
@@ -130,5 +130,6 @@ class Visualizer(object):
 
 if __name__ == "__main__":
 #     # visualizer = Visualizer("dgea_robin", [7, 8], "fitnesses_e7e8.csv", "diversity_e7e8.csv", True, True)
-    visualizer = Visualizer("dgea_test", 5, [7, 8], "fitnesses_e7e8.csv", "best_fits_e7e8.csv", "diversity_e7e8.csv", True, True)
+    visualizer = Visualizer("newblood_test", 5, [7, 8], "fitnesses_e7e8.csv", "best_fits_e7e8.csv",
+                            "diversity_e7e8.csv", True, True)
 #     # visualizer = Visualizer("dgea_test_bigger", [7, 8], "fitnesses_e7e8.csv", "diversity_e7e8.csv", True, True)
