@@ -51,7 +51,8 @@ class DGEA(object):
         # initialize tracking variables for statistics of simulation
         self.fitnesses, self.best_fit_gens, self.diversity_gens = [], [], []
         self.best_fit, self.best_sol = None, None
-        self.best_sols, self.not_improved = [], 0
+        self.best_fits, self.best_sols = [], []
+        self.not_improved = 0
 
     def play_game(self, sol):
         """
@@ -146,7 +147,7 @@ class DGEA(object):
 
         return population
 
-    def update_statistics(self, curr_sim, gen, fitnesses, controls, diversity):
+    def update_statistics(self, curr_sim, gen, fitnesses, population, diversity):
         """
         Update the statistics for given generation
         """
@@ -158,17 +159,17 @@ class DGEA(object):
             }
             self.fitnesses.append(stats)
 
+        best_fit_gen = max(fitnesses)
         self.best_fit_gens.append(
-            {"simulation": curr_sim, "generation": gen, "best fit": self.best_fit}
+            {"simulation": curr_sim, "generation": gen, "best fit": best_fit_gen}
         )
         self.diversity_gens.append(
             {"simulation": curr_sim, "generation": gen, "diversity": diversity}
         )
 
-        best_fit_gen = max(fitnesses)
         if self.best_fit is None or best_fit_gen > self.best_fit:
             self.best_fit = best_fit_gen
-            self.best_sol = controls[fitnesses.index(self.best_fit)]
+            self.best_sol = population[fitnesses.index(self.best_fit)]
             self.best_fits = [self.best_fit]
             self.best_sols = [self.best_sol]
             self.not_improved = 0
@@ -177,9 +178,14 @@ class DGEA(object):
         # we also should add a the diversity measure here cause otherwise 
         # we will save a lot of duplicate controllers with the same score instead
         # of different controllers with the (almost the?) same score
-        # elif best_fit_gen == self.best_fit:
-        #     self.best_sols.append(controls[fitnesses.index(best_fit_gen)])
-        #     self.not_improved += 1
+        elif best_fit_gen == self.best_fit:
+            best_candidate = population[fitnesses.index(best_fit_gen)]
+            distances = [np.linalg.norm(best_candidate - sol) for sol in self.best_sols]
+            if min(distances) != 0:
+                self.best_sols.append(best_candidate)
+            
+            if self.mode == "Explore":
+                self.not_improved += 1
 
         # Only keep track of no improvements if we diversity is low (Explore fase)
         elif self.mode == "Explore":
@@ -294,8 +300,12 @@ class DGEA(object):
         self.calc_clustering(population, curr_sim, gen)
         pbar.close()
 
-        return self.fitnesses, self.best_fit_gens, self.diversity_gens, self.best_fit, self.best_sol, total_exploit, \
-               total_explore
+        values = [
+            self.fitnesses, self.best_fit_gens, self.diversity_gens, self.best_fit,
+            self.best_sol, self.best_sols, total_exploit, total_explore
+        ]
+
+        return values
 
     def reset_algorithm(self):
         """

@@ -38,18 +38,18 @@ if __name__ == "__main__":
     parameters = collect_parameters(filename)
 
     if parser.tune:
-        tuner = BasicGA(experiment_name, parameters, parser.enemies, 2, True)
-        tuner.run()
+        tuner = BasicGA(experiment_name, parameters, parser.enemies, 1, True)
+        best_fits, best_parameters = tuner.run()
 
-    # if parser.algorithm == "dgea":
-    #     GA = DGEA(experiment_name, parameters, parser.enemies)
+    if parser.algorithm == "dgea":
+        GA = DGEA(experiment_name, parameters, parser.enemies)
     # elif parser.algorithm == "newblood":
     #     GA = NewBlood(experiment_name, parameters, parser.enemies)
         
-    # MC = MonteCarlo(experiment_name, GA, parameters["N"], parser.save_output)
-    # MC.run()
+    MC = MonteCarlo(experiment_name, GA, parameters["N"], parser.save_output)
+    MC.run()
 
-    # visualizer = Visualizer(
-    #     experiment_name, parameters["total_generations"], GA.enemies, MC.csv_fitnesses, 
-    #     MC.csv_best_fits, MC.csv_diversity, parser.show_plot, parser.save_output
-    # )
+    visualizer = Visualizer(
+        experiment_name, parameters["total_generations"], GA.enemies, MC.csv_fitnesses, 
+        MC.csv_best_fits, MC.csv_diversity, parser.show_plot, parser.save_output
+    )

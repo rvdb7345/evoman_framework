@@ -35,6 +35,7 @@ class BasicGA(object):
         self.enemies = enemies
         self.save_output = save_output
         self.data = []
+        self.best_fits, self.best_combos = [], []
 
         # make csv filename for fitness and diversity
         enemies_str = ""
@@ -48,12 +49,12 @@ class BasicGA(object):
         tries to "equally" distributed the parameters combinations
         """
         # set up initial "search spaces" for better distributed sampling
-        ranges_dmin = [[0, 0.1], [0.1, 0.2], [0.2, 0.3]]
-        ranges_dmax = [0.5, 0.7, 1]
+        ranges_dmin = [[0, 0.15], [0.15, 0.30]]
+        ranges_dmax = [0.5, 1]
         len_ranges_div = len(ranges_dmin)
-        ranges_mutation_factor = [[0, 0.1], [0.1, 0.2]]
+        ranges_mutation_factor = [[0, 0.15], [0.15, 0.30]]
         len_ranges_mutation = len(ranges_mutation_factor)
-        total_combos = 3 * (len_ranges_div + len_ranges_mutation)
+        total_combos = 1 * (len_ranges_div + len_ranges_mutation)
 
         # semi-randomly sample initial (dmin, dmax, mutation factor) population
         population = np.zeros((total_combos, 3))
@@ -82,7 +83,7 @@ class BasicGA(object):
             self.parameters["dmax"] = dmax
             self.parameters["mutation_factor"] = mutation_factor
             GA = DGEA(self.name, self.parameters, self.enemies)
-            _, _, _, best_fit, _, _, _ = GA.run(gen)
+            _, _, _, best_fit, _, _, _, _ = GA.run(gen)
             scores[i] = best_fit
 
         return scores
@@ -101,6 +102,19 @@ class BasicGA(object):
                 "best fitness": best_fit
             }
             self.data.append(data)
+            
+            # keep track of best solution
+            if len(self.best_fits) == 0:
+                self.best_fits = [best_fit]
+                self.best_combos = [(dmin, dmax, mutation_factor)]
+            elif best_fit > self.best_fits[0]:
+                self.best_fits = [best_fit]
+                self.best_combos = [(dmin, dmax, mutation_factor)]
+            elif best_fit == self.best_fits[0]:
+                for (x, y, z) in self.best_combos:
+                    if x - dmin != 0 or y - dmax != 0 or z - mutation_factor != 0:
+                        self.best_fits.append(best_fit)
+                        self.best_combos.append((dmin, dmax, mutation_factor))
 
     def tournament(self, population, scores):
         """
@@ -114,7 +128,7 @@ class BasicGA(object):
 
         return population[idx2]
 
-    def crossover(self, population, scores, total_combos):
+    def crossover(self, population, scores):
         """
         Perfroms a linear crossover with the weights sampled from a uniform
         distribution. Note that it always ensures that dmin < dmax
@@ -122,7 +136,7 @@ class BasicGA(object):
 
         # start creating offspring
         all_offspring = np.zeros((0, population.shape[1]))
-        for offspring in range(total_combos):
+        for offspring in range(population.shape[0]):
             parent1 = self.tournament(population, scores)
             parent2 = self.tournament(population, scores)
             weigth = np.random.uniform()
@@ -172,6 +186,7 @@ class BasicGA(object):
         # run first population
         gen = 0
         population = self.make_initial_population()
+        pop_size = population.shape[0]
         scores = self.play(population, gen)
         self.update_data(gen, population, scores)
 
@@ -179,22 +194,25 @@ class BasicGA(object):
         for gen in progressbar(range(1, self.total_generations + 1), desc="evolutionary loop Tuner"):
 
             # make offspring, evaluate and keep track of data
-            offspring = self.crossover(population, scores, total_combos)
+            offspring = self.crossover(population, scores)
             scores_offspring = self.play(offspring, gen)
             population = np.vstack((population, offspring))
             scores = np.append(scores, scores_offspring)
             self.update_data(gen, population, scores)
 
             # best score and best combo
-            best_score = np.argmax(scores)
-            best_combo = population[best_score]
+            best_score_idx = np.argmax(scores)
+            # best_combo = population[best_score]
 
             # roulette wheel survival selection (no replacement), with 1 individual elitism
             norm_scores = self.normalise_scores(scores)
             probs = norm_scores / norm_scores.sum()
-            chosen = np.random.choice(population.shape[0], total_combos, p=probs, replace=False)
-            chosen = np.append(chosen[1, :], best_combo)
-            
+            chosen = np.random.choice(population.shape[0], pop_size, p=probs, replace=False)
+            chosen = np.append(chosen[1, :], best_score_idx)
+            population = population[chosen]
+            scores = scores[chosen]
 
         if self.save_output:
             self.save_data()
+
+        return self.best_fits, self.best_combos
