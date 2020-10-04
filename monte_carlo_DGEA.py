@@ -12,6 +12,7 @@ Julien Fer, ...., ...., ....
 import os
 import shutil
 import pandas as pd
+from tqdm import tqdm as progressbar
 
 class MonteCarlo(object):
     """
@@ -72,7 +73,7 @@ class MonteCarlo(object):
         """
 
         # start simulation
-        for n in range(self.N):
+        for n in progressbar(range(self.N), desc="monte carlo loop"):
             # enemy, best_fit, best_sol, generations_sum_df = self.GA.run()
             fitnesses, best_fits, diversities, best_fit, best_sol, total_exploit, total_explore = self.GA.run(n)
 

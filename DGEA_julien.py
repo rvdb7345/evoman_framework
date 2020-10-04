@@ -16,7 +16,7 @@ from multiprocessing import Pool, cpu_count
 # import third parties packages
 import numpy as np
 import matplotlib.pyplot as plt
-from tqdm import tqdm as processbar
+from tqdm import tqdm as progressbar
 
 # import custom module (others)
 from environment import Environment
@@ -238,8 +238,8 @@ class DGEA(object):
         gen, self.mode = 0, "Exploit"
         total_exploit, total_explore = 0, 0
 
-        # initalize processbar
-        pbar = processbar(total=self.total_generations)
+        # initalize progressbar
+        pbar = progressbar(total=self.total_generations, desc="evolutionary loop DGEA")
 
         # run initial population
         pool = Pool(cpu_count())
@@ -256,7 +256,7 @@ class DGEA(object):
         pbar.update(1)
 
         # start evolutionary algorithm
-        # for gen in processbar(range(1, self.total_generations + 1)):
+        # for gen in progressbar(range(1, self.total_generations + 1)):
         while gen < self.total_generations + 1 and self.not_improved < self.max_no_improvements:
             gen += 1
             if diversity < self.dmin:
@@ -292,6 +292,7 @@ class DGEA(object):
             pbar.update(1)
 
         self.calc_clustering(population, curr_sim, gen)
+        pbar.close()
 
         return self.fitnesses, self.best_fit_gens, self.diversity_gens, self.best_fit, self.best_sol, total_exploit, \
                total_explore
@@ -306,7 +307,7 @@ class DGEA(object):
 
 
 class NewBlood(DGEA):
-    def mutation(self, population, fitnesses=None):
+    def mutation(self, population, fitnesses):
         '''
         This function replaces mutation_prob of the worst individuals of the population with random individuals. This
         was chosen to keep the number of individuals that are changed by a mutation step constant with the DGEA.
