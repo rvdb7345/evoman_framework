@@ -191,26 +191,6 @@ class DGEA(object):
         elif self.mode == "Explore":
             self.not_improved += 1
 
-    def calc_clustering(self, population, curr_sim, gen):
-        inertias = []
-        clusters = np.arange(2, len(population))
-        for i in clusters:
-            kmeans = KMeans(n_clusters=i, random_state=0, n_jobs=-1).fit(population)
-            inertias.append(kmeans.inertia_)
-
-        enemies_str = ""
-        for enemy in self.enemies:
-            enemies_str += "e" + str(enemy)
-        filename = "kmeans_clustering_sim" + str(curr_sim) + "_gen" + str(gen) + ".png"
-        path = os.path.join(self.results_folder, filename)
-        plt.figure()
-        plt.plot(clusters, inertias)
-        plt.xlabel('clusters (#)')
-        plt.ylabel('Inertia')
-        plt.title('Kmeans clustering of the population')
-        plt.savefig(path, dpi=300)
-        plt.close()
-
     def run(self, curr_sim):
         """
         Run evolutionary algorithm
@@ -298,7 +278,6 @@ class DGEA(object):
 
             pbar.update(1)
 
-        self.calc_clustering(population, curr_sim, gen)
         pbar.close()
 
         values = [

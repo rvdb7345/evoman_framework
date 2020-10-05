@@ -158,6 +158,27 @@ class Visualizer(object):
             plt.show()
         plt.close()
 
+    # STILL NEEDS TO BE CHANGED!!!!!!
+    # def calc_clustering(self, population, curr_sim, gen):
+    #     inertias = []
+    #     clusters = np.arange(2, len(population))
+    #     for i in clusters:
+    #         kmeans = KMeans(n_clusters=i, random_state=0, n_jobs=-1).fit(population)
+    #         inertias.append(kmeans.inertia_)
+
+    #     enemies_str = ""
+    #     for enemy in self.enemies:
+    #         enemies_str += "e" + str(enemy)
+    #     filename = "kmeans_clustering_sim" + str(curr_sim) + "_gen" + str(gen) + ".png"
+    #     path = os.path.join(self.results_folder, filename)
+    #     plt.figure()
+    #     plt.plot(clusters, inertias)
+    #     plt.xlabel('clusters (#)')
+    #     plt.ylabel('Inertia')
+    #     plt.title('Kmeans clustering of the population')
+    #     plt.savefig(path, dpi=300)
+    #     plt.close()
+
 
 if __name__ == "__main__":
 #     # visualizer = Visualizer("dgea_robin", [7, 8], "fitnesses_e7e8.csv", "diversity_e7e8.csv", True, True)

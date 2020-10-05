@@ -152,12 +152,8 @@ class BasicGA(object):
             if np.random.uniform() < self.mutation_prob:
                 child += np.random.normal()
 
-            # make sure variables represent probalities (range 0-1)
-            for value in child:
-                if value > 1:
-                    value = 0.9999999
-                elif value < 0:
-                    value = 0.0000001
+            # make sure variables represent probalities (interval (0, 1))
+            child = np.clip(child, 0.0000001, 0.9999999)
 
             # make sure dmin is smaller than dmax
             if child[0] > child[1]:
