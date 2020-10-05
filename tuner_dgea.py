@@ -40,7 +40,7 @@ class BasicGA(object):
         self.ranges_dmin = [[0, 0.15], [0.15, 0.30]]
         self.ranges_dmax = [0.5, 1]
         self.ranges_mutation_factor = [[0, 0.15], [0.15, 0.30]]
-        self.individual_per_interval = 1
+        self.individual_per_interval = 3
 
         # attributes to keep track of best fits and its corresponding parameters
         self.data = []

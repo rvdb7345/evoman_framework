@@ -209,6 +209,7 @@ class DGEA(object):
         plt.ylabel('Inertia')
         plt.title('Kmeans clustering of the population')
         plt.savefig(path, dpi=300)
+        plt.close()
 
     def run(self, curr_sim):
         """
@@ -332,6 +333,35 @@ class NewBlood(DGEA):
 
         # add new, random individuals to the population
         new_population = np.random.uniform(self.lower_bound, self.upper_bound, (ind_to_replace, self.n_vars))
+        sorted_pop[0:ind_to_replace] = new_population
+
+        return sorted_pop
+
+class NewBloodDirected(DGEA):
+    """
+    Mutation scheme where the worst precentage of the population is replaced by
+    a random population with their weights sampled with a direction "away" from 
+    the mean of the population
+    """
+    def mutation(self, population, fitnesses):
+        
+        # sort the population based on fitness and alreade "delete" worst percentage
+        sorted_fit_pop = sorted(list(zip(fitnesses, population)), key=lambda x: x[0])
+        sorted_pop = np.array([ind for _, ind in sorted_fit_pop])
+        ind_to_replace = int(self.mutation_prob * len(sorted_pop))
+        sorted_pop[0:ind_to_replace] = 0
+
+        # determine mean vector remaining population and determine intervals 
+        # for random sampling
+        average_vec = np.mean(sorted_pop[ind_to_replace:], axis=0)
+        intervals = np.zeros((population.shape[1], 2))
+        for i, weight in enumerate(average_vec):
+            if weight > 0:
+                intervals[i, 0], intervals[i, 1] = -1, (weight - 1) / 2
+            else:
+                intervals[i, 0], intervals[i, 1] = (weight + 1) / 2, 1
+
+        new_population = np.random.uniform(intervals[:, 0], intervals[:, 1], (ind_to_replace, population.shape[1]))
         sorted_pop[0:ind_to_replace] = new_population
 
         return sorted_pop
