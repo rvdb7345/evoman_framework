@@ -246,6 +246,7 @@ class DGEA(object):
         # start evolutionary algorithm
         # for gen in progressbar(range(1, self.total_generations + 1)):
         while gen < self.total_generations + 1 and self.not_improved < self.max_no_improvements:
+            print("The population currently has {} individuals".format(len(population)))
             gen += 1
             if diversity < self.dmin:
                 self.mode = "Explore"
@@ -305,7 +306,6 @@ class NewBlood(DGEA):
         # sort the population based on fitness and replace worst
         sorted_fit_pop = sorted(list(zip(fitnesses, population)), key=lambda x: x[0])
         sorted_pop = np.array([ind for _, ind in sorted_fit_pop])
-        print(sorted_pop)
         ind_to_replace = int(self.mutation_prob * len(sorted_pop))
         sorted_pop[0:ind_to_replace] = 0
 

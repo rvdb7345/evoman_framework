@@ -38,13 +38,13 @@ class BasicGA(object):
         self.mutation_prob = 0.2
 
         # search intervals for parameters
-        self.ranges_dmin = [[0, 0.15], [0.15, 0.30]]
-        self.ranges_dmax = [0.5, 1]
+        self.ranges_dmin = [[0, 0.05], [0.05, 0.1]]
+        self.ranges_dmax = [0.3, 0.5]
         if self.algorithm_name == "dgea":
-            self.ranges_mutation = [[0, 0.15], [0.15, 0.30]]
+            self.ranges_mutation = [[0, 0.1], [0.1, 0.2]]
         else:
             self.ranges_mutation = [[0.5, 0.7], [0.7, 1]]
-        self.individual_per_interval = 1
+        self.individual_per_interval = 3
 
         # attributes to keep track of best fits and its corresponding parameters
         self.data = []
@@ -74,8 +74,7 @@ class BasicGA(object):
             idx_dmin = i % len_ranges_div
             dmin_lb, dmin_ub = self.ranges_dmin[idx_dmin]
             dmin = np.random.uniform(dmin_lb, dmin_ub)
-            dmax_ub = self.ranges_dmax[idx_dmin]
-            dmax = np.random.uniform(dmin + 1e-5, dmax_ub)
+            dmax = np.random.uniform(*self.ranges_dmax)
             population[i, 0], population[i, 1] = dmin, dmax
 
             # sample mutation factor
@@ -229,6 +228,9 @@ class BasicGA(object):
         gen = 0
         population = self.make_initial_population()
         pop_size = population.shape[0]
+
+        print(pop_size)
+
         scores = self.play(population, gen)
         self.update_data(gen, population, scores)
 

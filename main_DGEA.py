@@ -40,7 +40,7 @@ if __name__ == "__main__":
 
     # tune a few parameters and choose best parameters combo at random (if more found)
     if parser.tune:
-        gens = 2
+        gens = 9
         tuner = BasicGA(experiment_name, parameters, parser.enemies, gens, True)
         best_fits, best_parameters = tuner.run()
         best_combo = random.choice(best_parameters)
