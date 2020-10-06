@@ -106,8 +106,8 @@ class DGEA(object):
         """
         nr_children = int(population.shape[0] * self.fraction_replace)
         all_offsprings = np.zeros((0, self.n_vars))
-        all_offsprings = np.vstack((all_offsprings, self.best_sol))
-        child = 1
+        # all_offsprings = np.vstack((all_offsprings, self.best_sol))
+        child = 0
 
         # start making offspring (two for each couple of parents)
         while child < nr_children:
@@ -126,6 +126,9 @@ class DGEA(object):
             all_offsprings = np.vstack((all_offsprings, offspring1))
             all_offsprings = np.vstack((all_offsprings, offspring2))
             child += 2
+
+        # 1 elitism 
+        all_offsprings[-1, :] = self.best_sol
 
         return all_offsprings
 
@@ -230,6 +233,7 @@ class DGEA(object):
         pbar = progressbar(total=self.total_generations, desc="evolutionary loop DGEA")
 
         # run initial population
+        # pool = Pool(int(round(cpu_count() * 0.75)))
         pool = Pool(cpu_count())
         pool_input = [sol for sol in population]
         pool_results = pool.map(self.play_game, pool_input)
@@ -246,7 +250,6 @@ class DGEA(object):
         # start evolutionary algorithm
         # for gen in progressbar(range(1, self.total_generations + 1)):
         while gen < self.total_generations + 1 and self.not_improved < self.max_no_improvements:
-            print("The population currently has {} individuals".format(len(population)))
             gen += 1
             if diversity < self.dmin:
                 self.mode = "Explore"
@@ -265,6 +268,7 @@ class DGEA(object):
             population = np.clip(population, self.lower_bound, self.upper_bound)
 
             # run new population
+            # pool = Pool(int(round(cpu_count() * 0.75)))
             pool = Pool(cpu_count())
             pool_input = [sol for sol in population]
             pool_results = pool.map(self.play_game, pool_input)
@@ -295,6 +299,49 @@ class DGEA(object):
         self.best_fit, self.best_sol = None, None
         self.best_sols, self.not_improved = [], 0
 
+class NewBloodRandom(DGEA):
+    """
+    Mutation scheme where a specific precentage of the population (randomly sampled) 
+    is replaced by a random offspring
+    """
+    def mutation(self, population, fitnesses):
+        """
+        Randomly replace percentage of population by randomly sampled  offspring
+        """
+
+        # randomly select parents to replace by offspring
+        amount_to_replace = int(self.pop_size * self.mutation_prob)
+        chosen = np.random.choice(self.pop_size, amount_to_replace, replace=False)
+        population[chosen] = np.random.uniform(self.lower_bound, self.upper_bound,  (amount_to_replace, self.n_vars))
+        return population
+
+class NewBloodRandomElitism(DGEA):
+    """
+    Mutation scheme where a specific precentage of the population (randomly sampled) 
+    is replaced by a offspring of which the weights are randomly sampled from
+    either the best current individual or uniform distribution
+    """
+    def mutation(self, population, fitnesses):
+        """
+        Replace percentage of population by offpring
+        """
+        amount_to_replace = int(self.pop_size * self.mutation_prob)
+        order = np.argsort(fitnesses)
+        ascending_order = order[0:amount_to_replace]
+        best_individual = population[order[-1]]
+
+        # replace worst individuals
+        for idx_individual in ascending_order:
+            for idx_weight in range(self.n_vars):
+                prob = np.random.uniform()
+
+                # replace weight by random number or by the weight of best individual
+                if np.random.uniform() < prob:
+                    pop[idx_individual, idx_weight] = np.random.uniform(self.lower_bound, self.upper_bound)
+                else:
+                    pop[idx_individual, idx_weight] = best_individual[idx_weight]
+
+        return population
 
 class NewBlood(DGEA):
     def mutation(self, population, fitnesses):
