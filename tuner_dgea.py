@@ -14,7 +14,7 @@ import shutil
 import numpy as np
 import pandas as pd
 from tqdm import tqdm as progressbar
-from DGEA_julien import DGEA
+from DGEA_julien import DGEA, NewBlood, NewBloodDirected
 
 class BasicGA(object):
     """
@@ -24,6 +24,7 @@ class BasicGA(object):
         """
         Initialize attributes
         """
+        self.algorithm_name = name.split("_")[0]
         self.name = name + "_tuning"
         self.results_folder = os.path.join("results", self.name)
         if os.path.exists(self.results_folder) and save_output:
@@ -39,8 +40,11 @@ class BasicGA(object):
         # search intervals for parameters
         self.ranges_dmin = [[0, 0.15], [0.15, 0.30]]
         self.ranges_dmax = [0.5, 1]
-        self.ranges_mutation_factor = [[0, 0.15], [0.15, 0.30]]
-        self.individual_per_interval = 3
+        if self.algorithm_name == "dgea":
+            self.ranges_mutation = [[0, 0.15], [0.15, 0.30]]
+        else:
+            self.ranges_mutation = [[0.5, 0.7], [0.7, 1]]
+        self.individual_per_interval = 1
 
         # attributes to keep track of best fits and its corresponding parameters
         self.data = []
@@ -59,7 +63,7 @@ class BasicGA(object):
         """
         # set up initial "search spaces" for better distributed sampling
         len_ranges_div = len(self.ranges_dmin)
-        len_ranges_mutation = len(self.ranges_mutation_factor)
+        len_ranges_mutation = len(self.ranges_mutation)
         total_combos = self.individual_per_interval * (len_ranges_div + len_ranges_mutation)
 
         # semi-randomly sample initial (dmin, dmax, mutation factor) population
@@ -76,19 +80,38 @@ class BasicGA(object):
 
             # sample mutation factor
             idx_mutation = i % len_ranges_mutation
-            fact_lb, fact_ub = self.ranges_mutation_factor[idx_mutation]
+            fact_lb, fact_ub = self.ranges_mutation[idx_mutation]
             mutation_fact = np.random.uniform(fact_lb, fact_ub)
             population[i, 2] = mutation_fact
 
         return population
     
     def play(self, population, gen):
+        """
+        Play loop to run the EA for each individual (paramaeter combination). 
+        Also, keeps track of the best fit found during the evolutionary run 
+        per individual
+        """
+
+        # start run
         scores = np.zeros(population.shape[0])
-        for i, (dmin, dmax, mutation_factor) in progressbar(enumerate(population), desc="play loop parameters"):
+        for i, (dmin, dmax, mutation) in progressbar(enumerate(population), desc="play loop parameters"):
+            GA = None
             self.parameters["dmin"] = dmin
             self.parameters["dmax"] = dmax
-            self.parameters["mutation_factor"] = mutation_factor
-            GA = DGEA(self.name, self.parameters, self.enemies)
+
+            # choose right evolutionary algorithm to run
+            if self.algorithm_name == "dgea":
+                self.parameters["mutation_factor"] = mutation
+                GA = DGEA(self.name, self.parameters, self.enemies)
+            elif self.algorithm == "newblood":
+                self.parameters["mutation_prob"] = mutation
+                GA = NewBlood(self.name, self.parameters, self.enemies)
+            else:
+                self.parameters["mutation_prob"] = mutation
+                GA = NewBloodDirected(self.name, self.parameters, self.enemies)
+
+            # keep track of best fitness found during the evolutionary run of EA
             _, _, _, best_fit, _, _, _, _ = GA.run(gen)
             scores[i] = best_fit
 
@@ -99,28 +122,33 @@ class BasicGA(object):
         Updates data (combosof parameters and its corresponding best fit) 
         for each generation
         """
-        for (dmin, dmax, mutation_factor), best_fit in zip(population, scores):
+        for (dmin, dmax, mutation), best_fit in zip(population, scores):
             data = {
                 "generation": gen,
                 "dmin": dmin,
                 "dmax": dmax,
-                "mutation factor": mutation_factor,
+                "mutation": mutation,
                 "best fitness": best_fit
             }
             self.data.append(data)
             
-            # keep track of best solution
+            # no best solution yet, so update best solution
             if len(self.best_fits) == 0:
                 self.best_fits = [best_fit]
-                self.best_combos = [(dmin, dmax, mutation_factor)]
+                self.best_combos = [(dmin, dmax, mutation)]
+
+            # better best solution found, so update best solution
             elif best_fit > self.best_fits[0]:
                 self.best_fits = [best_fit]
-                self.best_combos = [(dmin, dmax, mutation_factor)]
+                self.best_combos = [(dmin, dmax, mutation)]
+
+            # equally good solution found, but only keep track if they differ from
+            # all previous solutions found
             elif best_fit == self.best_fits[0]:
                 for (x, y, z) in self.best_combos:
-                    if x - dmin != 0 or y - dmax != 0 or z - mutation_factor != 0:
+                    if x - dmin != 0 or y - dmax != 0 or z - mutation != 0:
                         self.best_fits.append(best_fit)
-                        self.best_combos.append((dmin, dmax, mutation_factor))
+                        self.best_combos.append((dmin, dmax, mutation))
 
     def tournament(self, population, scores):
         """
@@ -167,7 +195,8 @@ class BasicGA(object):
 
     def normalise_scores(self, scores):
         """
-        Normalize scores to represent probabilites
+        Normalize scores between 0 and 1 (x - min) / (max - min), negative 
+        values are set to a "minimum" positive value
         """
         norm_scores = np.zeros(len(scores))
         for i, score in enumerate(scores):

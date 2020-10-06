@@ -155,16 +155,17 @@ class DGEA(object):
             stats = {
                 "simulation": curr_sim,
                 "generation": gen,
-                "fitness": fitness
+                "fitness": fitness, 
+                "mode": self.mode
             }
             self.fitnesses.append(stats)
 
         best_fit_gen = max(fitnesses)
         self.best_fit_gens.append(
-            {"simulation": curr_sim, "generation": gen, "best fit": best_fit_gen}
+            {"simulation": curr_sim, "generation": gen, "best fit": best_fit_gen, "mode": self.mode}
         )
         self.diversity_gens.append(
-            {"simulation": curr_sim, "generation": gen, "diversity": diversity}
+            {"simulation": curr_sim, "generation": gen, "diversity": diversity, "mode": self.mode}
         )
 
         if self.best_fit is None or best_fit_gen > self.best_fit:
@@ -247,8 +248,6 @@ class DGEA(object):
         while gen < self.total_generations + 1 and self.not_improved < self.max_no_improvements:
             gen += 1
             if diversity < self.dmin:
-                if self.mode == "Exploit":
-                    self.calc_clustering(population, curr_sim, gen)
                 self.mode = "Explore"
             elif diversity > self.dmax:
                 self.mode = "Exploit"

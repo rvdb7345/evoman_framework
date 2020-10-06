@@ -39,8 +39,8 @@ if __name__ == "__main__":
     parameters = collect_parameters(filename)
 
     # tune a few parameters and choose best parameters combo at random (if more found)
-    if parser.tune and parser.algorithm == "dgea":
-        gens = 10
+    if parser.tune:
+        gens = 2
         tuner = BasicGA(experiment_name, parameters, parser.enemies, gens, True)
         best_fits, best_parameters = tuner.run()
         best_combo = random.choice(best_parameters)
@@ -62,12 +62,12 @@ if __name__ == "__main__":
     MC.run()
 
     # plot results
-    if parser.tune:
+    if parser.tune and (parser.show_plot or parser.save_output):
         visualizer = Visualizer(
             experiment_name, parameters["total_generations"], GA.enemies, MC.csv_fitnesses, 
             MC.csv_best_fits, MC.csv_diversity, parser.show_plot, parser.save_output, tuner.csv_fitnesses
         )
-    else:
+    elif parser.show_plot or parser.save_output:
         visualizer = Visualizer(
             experiment_name, parameters["total_generations"], GA.enemies, MC.csv_fitnesses, 
             MC.csv_best_fits, MC.csv_diversity, parser.show_plot, parser.save_output
