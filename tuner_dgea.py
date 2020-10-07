@@ -10,11 +10,10 @@ Julien Fer, Robin van den Berg, ...., ....
 """
 
 import os
-# import shutil
 import numpy as np
 import pandas as pd
 from tqdm import tqdm as progressbar
-from DGEA_julien import DGEA, NewBlood, NewBloodDirected
+from DGEA_julien import DGEA, NewBlood, NewBloodRandom, NewBloodDirected, NewBloodRandomElitism
 
 class BasicGA(object):
     """
@@ -27,8 +26,6 @@ class BasicGA(object):
         self.algorithm_name = name.split("_")[0]
         self.name = name + "_tuning"
         self.results_folder = os.path.join("results", self.name)
-        # if os.path.exists(self.results_folder) and save_output:
-        #     shutil.rmtree(self.results_folder)
         if save_output:
             os.makedirs(self.results_folder, exist_ok=True)
         self.parameters = parameters
@@ -48,6 +45,7 @@ class BasicGA(object):
 
         # attributes to keep track of best fits and its corresponding parameters
         self.data = []
+        self.best_fit, self.best_combo = None, None
         self.best_fits, self.best_combos = [], []
 
         # make csv filename for fitness and diversity
@@ -103,12 +101,18 @@ class BasicGA(object):
             if self.algorithm_name == "dgea":
                 self.parameters["mutation_factor"] = mutation
                 GA = DGEA(self.name, self.parameters, self.enemies)
-            elif self.algorithm == "newblood":
+            elif self.algorithm_name == "newblood":
                 self.parameters["mutation_prob"] = mutation
                 GA = NewBlood(self.name, self.parameters, self.enemies)
-            else:
+            elif self.algorithm_name == "newblood_directed":
                 self.parameters["mutation_prob"] = mutation
                 GA = NewBloodDirected(self.name, self.parameters, self.enemies)
+            elif self.algorithm_name == "newblood_random":
+                self.parameters["mutation_prob"] = mutation
+                GA = NewBloodRandom(self.name, self.parameters, self.enemies)
+            else:
+                self.parameters["mutation_prob"] = mutation
+                GA = NewBloodRandomElitism(self.name, self.parameters, self.enemies)
 
             # keep track of best fitness found during the evolutionary run of EA
             _, _, _, best_fit, _, _, _, _ = GA.run(gen)
@@ -131,23 +135,40 @@ class BasicGA(object):
             }
             self.data.append(data)
             
-            # no best solution yet, so update best solution
-            if len(self.best_fits) == 0:
+            # no best solution yet or significantly better solution found, 
+            # if so (re)start collection of best solutions
+            if self.best_fit is None or best_fit > 1.05 * self.best_fit:
+                self.best_fit = best_fit
+                self.best_combo = [(dmin, dmax, mutation)]
                 self.best_fits = [best_fit]
                 self.best_combos = [(dmin, dmax, mutation)]
 
-            # better best solution found, so update best solution
-            elif best_fit > self.best_fits[0]:
-                self.best_fits = [best_fit]
-                self.best_combos = [(dmin, dmax, mutation)]
+            # better best solution found, so update best solution 
+            # and determine if old solutions should be kept 
+            elif best_fit > self.best_fit:
+                self.best_fit = best_fit
+                self.best_combo = (dmin, dmax, mutation)
+
+                new_best_fits, new_best_combos = [self.best_fit], [self.best_combo]
+                for old_fit, old_combo in zip(self.best_fits, self.best_combos):
+                    difference = sum([abs(best - old) for best, old in zip((dmin, dmax, mutation), old_combo)])
+                    if old_fit >= 0.95 * best_fit and difference > 0.05 * len(self.best_combo):
+                        new_best_fits.append(old_fit), new_best_combos.append(old_combo)
+
+                self.best_fits, self.best_combos = new_best_fits, new_best_combos
 
             # equally good solution found, but only keep track if they differ from
             # all previous solutions found
-            elif best_fit == self.best_fits[0]:
-                for (x, y, z) in self.best_combos:
-                    if x - dmin != 0 or y - dmax != 0 or z - mutation != 0:
-                        self.best_fits.append(best_fit)
-                        self.best_combos.append((dmin, dmax, mutation))
+            elif best_fit >= 0.95 * self.best_fit:
+                differences = []
+                for (old_dmin, old_dmax, old_mutation) in self.best_combos:
+                    difference = abs(dmin - old_dmin) + abs(dmax - old_dmax) + abs(mutation - old_mutation)
+                    differences.append(difference)
+
+                if min(differences) > 0.05 * len(self.best_combo):
+                    self.best_fits.append(best_fit)
+                    self.best_combos.append((dmin, dmax, mutation))
+                
 
     def tournament(self, population, scores):
         """
