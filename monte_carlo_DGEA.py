@@ -50,18 +50,38 @@ class MonteCarlo(object):
         Keep track of the best solutions (configuration NN) over all the 
         Monte Carlo simulation
         """
+
+        # for each possible new solution we check if we add it to our collection of best solutions
         for best_fit, best_sol in zip(best_fits, best_solutions):
+
+            # new best solutions is significantly better, so "restart" collections of best solutions
             if self.best_fit is None or best_fit > 1.05 * self.best_fit:
                 self.best_fit = best_fit
                 self.best_fits = [best_fit]
                 self.best_sols = [best_sol]
-            elif best_fit >= 0.95 * self.best_fit and best_fit <= 1.05 * self.best_fit:
+
+            # new best solution is bit better, so update best sol and determine
+            # which old solutions we should keep
+            elif best_fit > self.best_fit:
+                self.best_fit = best_fit
+                new_best_fits, new_best_sols = [best_fit], [best_sol]
+                for old_fit, old_sol in zip(self.best_fits, self.best_sols):
+                    distance = np.linalg.norm(best_sol - old_sol)
+
+                    # only keep old solution of which the fitnesses are in range and
+                    # which are "different" from the current best solution
+                    if old_fit >= 0.95 * best_fit and distance / self.GA.L > 0.1:
+                        new_best_fits.append(old_fit), new_best_sols.append(old_sol)
+                
+                self.best_fits, self.best_sols = new_best_fits, new_best_sols
+
+            # only keep worse solutions if their fitness are within range and if 
+            # different from current best solution
+            elif best_fit >= 0.95 * self.best_fit:
                 distances = [np.linalg.norm(best_sol - curr_best) for curr_best in self.best_sols]
-                if min(distances) != 0 and min(distances) / self.GA.L > 0.1:
+                if min(distances) / self.GA.L > 0.1:
                     self.best_sols.append(solution)
                     self.best_fits.append(best_fit)
-                    if best_fit > self.best_fit:
-                        self.best_fit = best_fit
 
     def save_stats(self, sim, fitnesses, best_fits, diversity_gens):
         """
