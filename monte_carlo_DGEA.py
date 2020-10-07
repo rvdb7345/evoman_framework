@@ -111,27 +111,35 @@ class MonteCarlo(object):
         """
         Run monte carlo simulation of EA
         """
+        try:
+            # start simulation
+            for n in progressbar(range(self.N), desc="monte carlo loop"):
+                [
+                    fitnesses, best_fit_gens, diversity_gens, best_fit, 
+                    best_sol, best_fits, best_sols, total_exploit, total_explore
+                ] = self.GA.run(n)
+                
 
-        # start simulation
-        for n in progressbar(range(self.N), desc="monte carlo loop"):
-            [
-                fitnesses, best_fit_gens, diversity_gens, best_fit, 
-                best_sol, best_fits, best_sols, total_exploit, total_explore
-            ] = self.GA.run(n)
-            
+                # save statistics
+                if self.save_output:
+                    self.update_best_solutions(best_fits, best_sols)
+                    self.save_stats(n, fitnesses, best_fit_gens, diversity_gens)
 
-            # save statistics
+                # reset EA
+                self.GA.reset_algorithm()
+
+            # save best neural networks witth their best fitnesses
             if self.save_output:
-                self.update_best_solutions(best_fits, best_sols)
-                self.save_stats(n, fitnesses, best_fit_gens, diversity_gens)
-
-            # reset EA
-            self.GA.reset_algorithm()
-
-        # save best neural networks witth their best fitnesses
-        if self.save_output:
-            filename = os.path.join(self.results_folder, self.best_sols_name)
-            np.savez(filename, *self.best_sols)
-            filename = os.path.join(self.results_folder, self.best_fits_sols_name)
-            df = pd.DataFrame(self.best_fits)
-            df.to_csv(filename, mode='w', index=False)
+                filename = os.path.join(self.results_folder, self.best_sols_name)
+                np.savez(filename, *self.best_sols)
+                filename = os.path.join(self.results_folder, self.best_fits_sols_name)
+                df = pd.DataFrame(self.best_fits)
+                df.to_csv(filename, mode='w', index=False)
+            
+        except KeyboardInterrupt:
+            if self.save_output:
+                filename = os.path.join(self.results_folder, self.best_sols_name)
+                np.savez(filename, *self.best_sols)
+                filename = os.path.join(self.results_folder, self.best_fits_sols_name)
+                df = pd.DataFrame(self.best_fits)
+                df.to_csv(filename, mode='w', index=False)
