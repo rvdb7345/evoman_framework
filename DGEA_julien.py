@@ -171,7 +171,7 @@ class DGEA(object):
             {"simulation": curr_sim, "generation": gen, "diversity": diversity, "mode": self.mode}
         )
 
-        if self.best_fit is None or best_fit_gen > self.best_fit:
+        if self.best_fit is None or best_fit_gen > 1.05 * self.best_fit:
             self.best_fit = best_fit_gen
             self.best_sol = population[fitnesses.index(self.best_fit)]
             self.best_fits = [self.best_fit]
@@ -182,11 +182,16 @@ class DGEA(object):
         # we also should add a the diversity measure here cause otherwise 
         # we will save a lot of duplicate controllers with the same score instead
         # of different controllers with the (almost the?) same score
-        elif best_fit_gen == self.best_fit:
+        elif best_fit_gen >= 0.95 * self.best_fit and best_fit_gen <= 1.05 * self.best_fit:
             best_candidate = population[fitnesses.index(best_fit_gen)]
             distances = [np.linalg.norm(best_candidate - sol) for sol in self.best_sols]
-            if min(distances) != 0:
+            if min(distances) != 0 and min(distances) / self.L > 0.1:
                 self.best_sols.append(best_candidate)
+                self.best_fits.append(best_fit_gen)
+                if best_fit_gen > self.best_fit:
+                    self.best_fit = best_fit_gen
+                    self.best_sol = population[fitnesses.index(best_fit_gen)]
+                    self.not_improved = 0
             
             if self.mode == "Explore":
                 self.not_improved += 1
@@ -286,7 +291,7 @@ class DGEA(object):
 
         values = [
             self.fitnesses, self.best_fit_gens, self.diversity_gens, self.best_fit,
-            self.best_sol, self.best_sols, total_exploit, total_explore
+            self.best_sol, self.best_fits, self.best_sols, total_exploit, total_explore
         ]
 
         return values

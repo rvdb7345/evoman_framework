@@ -10,7 +10,7 @@ Julien Fer, ...., ...., ....
 """
 
 import os
-import shutil
+# import shutil
 import numpy as np
 import pandas as pd
 from tqdm import tqdm as progressbar
@@ -25,12 +25,13 @@ class MonteCarlo(object):
         self.GA = GA
         self.N = N
         self.save_output = save_output
-        self.best_fit, self.best_sols = None, []
+        self.best_fit = None
+        self.best_fits, self.best_sols = [], []
         self.results_folder = os.path.join("results", self.name)
 
         # remove old data if exists, and make sure a (new) results folder exists
-        if os.path.exists(self.results_folder) and save_output:
-            shutil.rmtree(self.results_folder)
+        # if os.path.exists(self.results_folder) and save_output:
+        #     shutil.rmtree(self.results_folder)
         if save_output:
             os.makedirs(self.results_folder, exist_ok=True)
 
@@ -42,20 +43,25 @@ class MonteCarlo(object):
         self.csv_best_fits = "best_fits_" + enemies_str + ".csv"
         self.csv_diversity = "diversity_" + enemies_str + ".csv"
         self.best_sols_name = "best_sols_" + enemies_str + ".npz"
+        self.best_fits_sols_name = "best_fits_best_sols" + enemies_str + ".csv"
 
-    def update_best_solutions(self, best_fit, best_solutions):
+    def update_best_solutions(self, best_fits, best_solutions):
         """
         Keep track of the best solutions (configuration NN) over all the 
         Monte Carlo simulation
         """
-        if self.best_fit is None or best_fit > self.best_fit:
-            self.best_fit = best_fit
-            self.best_sols = best_solutions
-        elif best_fit == self.best_fit:
-            for solution in best_solutions:
-                distances = [np.linalg.norm(solution - curr_best) for curr_best in self.best_sols]
-                if min(distances) != 0:
+        for best_fit, best_sol in zip(best_fits, best_solutions):
+            if self.best_fit is None or best_fit > 1.05 * self.best_fit:
+                self.best_fit = best_fit
+                self.best_fits = [best_fit]
+                self.best_sols = [best_sol]
+            elif best_fit >= 0.95 * self.best_fit and best_fit <= 1.05 * self.best_fit:
+                distances = [np.linalg.norm(best_sol - curr_best) for curr_best in self.best_sols]
+                if min(distances) != 0 and min(distances) / self.GA.L > 0.1:
                     self.best_sols.append(solution)
+                    self.best_fits.append(best_fit)
+                    if best_fit > self.best_fit:
+                        self.best_fit = best_fit
 
     def save_stats(self, sim, fitnesses, best_fits, diversity_gens):
         """
@@ -65,7 +71,7 @@ class MonteCarlo(object):
         # save fitnesses across the generations
         filename = os.path.join(self.results_folder, self.csv_fitnesses)
         df_fitnesses = pd.DataFrame(fitnesses)
-        if os.path.exists(filename):
+        if os.path.exists(filename) and sim != 0:
             df_fitnesses.to_csv(filename, mode='a', header=False, index=False)
         else:
             df_fitnesses.to_csv(filename, mode='w', index=False)
@@ -73,7 +79,7 @@ class MonteCarlo(object):
         # save best fits across the generations
         filename = os.path.join(self.results_folder, self.csv_best_fits)
         df_best_fits = pd.DataFrame(best_fits)
-        if os.path.exists(filename):
+        if os.path.exists(filename) and sim != 0:
             df_best_fits.to_csv(filename, mode='a', header=False, index=False)
         else:
             df_best_fits.to_csv(filename, mode='w', index=False)
@@ -81,7 +87,7 @@ class MonteCarlo(object):
         # save diversity across the generations
         filename = os.path.join(self.results_folder, self.csv_diversity)
         df_diversity = pd.DataFrame(diversity_gens)
-        if os.path.exists(filename):
+        if os.path.exists(filename) and sim != 0:
             df_diversity.to_csv(filename, mode='a', header=False, index=False)
         else:
             df_diversity.to_csv(filename, mode="w", index=False)
@@ -95,19 +101,22 @@ class MonteCarlo(object):
         for n in progressbar(range(self.N), desc="monte carlo loop"):
             [
                 fitnesses, best_fit_gens, diversity_gens, best_fit, 
-                best_sol, best_sols, total_exploit, total_explore
+                best_sol, best_fits, best_sols, total_exploit, total_explore
             ] = self.GA.run(n)
             
 
             # save statistics
             if self.save_output:
-                self.update_best_solutions(best_fit, best_sols)
+                self.update_best_solutions(best_fits, best_sols)
                 self.save_stats(n, fitnesses, best_fit_gens, diversity_gens)
 
             # reset EA
             self.GA.reset_algorithm()
 
-        # save best neural networks
+        # save best neural networks witth their best fitnesses
         if self.save_output:
             filename = os.path.join(self.results_folder, self.best_sols_name)
             np.savez(filename, *self.best_sols)
+            filename = os.path.join(self.results_folder, self.best_fits_sols_name)
+            df = pd.DataFrame(self.best_fits)
+            df.to_csv(filename, mode='w', index=False)

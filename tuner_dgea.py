@@ -10,7 +10,7 @@ Julien Fer, Robin van den Berg, ...., ....
 """
 
 import os
-import shutil
+# import shutil
 import numpy as np
 import pandas as pd
 from tqdm import tqdm as progressbar
@@ -27,8 +27,8 @@ class BasicGA(object):
         self.algorithm_name = name.split("_")[0]
         self.name = name + "_tuning"
         self.results_folder = os.path.join("results", self.name)
-        if os.path.exists(self.results_folder) and save_output:
-            shutil.rmtree(self.results_folder)
+        # if os.path.exists(self.results_folder) and save_output:
+        #     shutil.rmtree(self.results_folder)
         if save_output:
             os.makedirs(self.results_folder, exist_ok=True)
         self.parameters = parameters
@@ -213,7 +213,7 @@ class BasicGA(object):
 
     def save_data(self):
         """
-        Save data to csv  file
+        Save data to csv file
         """
         filename = os.path.join(self.results_folder, self.csv_fitnesses)
         df_data = pd.DataFrame(self.data)
