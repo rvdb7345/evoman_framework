@@ -327,11 +327,11 @@ class NewBloodRandomElitism(DGEA):
         """
         amount_to_replace = int(self.pop_size * self.mutation_prob)
         order = np.argsort(fitnesses)
-        ascending_order = order[0:amount_to_replace]
         best_individual = population[order[-1]]
+        chosen =  np.random.choice(self.pop_size, amount_to_replace, replace=False)
 
-        # replace worst individuals
-        for idx_individual in ascending_order:
+        # replace randomly chosen individuals
+        for idx_individual in chosen:
             for idx_weight in range(self.n_vars):
                 prob = np.random.uniform()
 
