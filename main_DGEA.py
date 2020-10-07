@@ -9,7 +9,6 @@ This code was implemented by
 Julien Fer, ...., ...., ....
 """
 
-
 # built-in modules
 import sys, os
 import random
@@ -46,9 +45,6 @@ if __name__ == "__main__":
         best_fits, best_parameters = tuner.run()
         best_combo = random.choice(best_parameters)
         parameters["dmin"], parameters["dmax"], parameters["mutation_factor"] = best_combo
-
-    ## IT IS EASIER TO PASS THE ALGORITHM NAME TO THE TUNER AND MAKE AN IF/ELIF/
-    ## STATEMENT IN THE LOOP TO DECIDE WHICH ALGORITHM TO USE
 
     # choose algorithm
     if parser.algorithm == "dgea":

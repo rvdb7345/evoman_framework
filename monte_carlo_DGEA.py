@@ -10,7 +10,6 @@ Julien Fer, ...., ...., ....
 """
 
 import os
-# import shutil
 import numpy as np
 import pandas as pd
 from tqdm import tqdm as progressbar
@@ -28,10 +27,6 @@ class MonteCarlo(object):
         self.best_fit = None
         self.best_fits, self.best_sols = [], []
         self.results_folder = os.path.join("results", self.name)
-
-        # remove old data if exists, and make sure a (new) results folder exists
-        # if os.path.exists(self.results_folder) and save_output:
-        #     shutil.rmtree(self.results_folder)
         if save_output:
             os.makedirs(self.results_folder, exist_ok=True)
 

@@ -1,0 +1,13 @@
+neurons=10
+lb=-1
+ub=1
+pop_size=30
+total_generations=200
+mutation_prob=0.75
+mutation_factor=0.1
+crossover_prob=0.9
+dmin=0.06
+dmax=0.37
+fraction_replace=1
+max_no_improvements=15
+N=10

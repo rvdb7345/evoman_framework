@@ -21,7 +21,6 @@ from tqdm import tqdm as progressbar
 # import custom module (others)
 from environment import Environment
 from demo_controller import player_controller
-from sklearn.cluster import KMeans
 
 
 class DGEA(object):
@@ -106,7 +105,6 @@ class DGEA(object):
         """
         nr_children = int(population.shape[0] * self.fraction_replace)
         all_offsprings = np.zeros((0, self.n_vars))
-        # all_offsprings = np.vstack((all_offsprings, self.best_sol))
         child = 0
 
         # start making offspring (two for each couple of parents)
@@ -140,7 +138,6 @@ class DGEA(object):
         average_vec = np.mean(population, axis=0)
         scale_factors = np.ones(len(population[0])) * self.mutation_frac
         stds_gaussian = abs(self.upper_bound - self.lower_bound) / 2
-        # stds_gaussian = abs(self.upper_bound - self.lower_bound) / 2 * 1/np.random.uniform()
 
         for individual in population:
             if np.random.uniform() < self.mutation_prob:
