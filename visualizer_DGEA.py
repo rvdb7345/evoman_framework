@@ -55,7 +55,7 @@ class Visualizer(object):
             plt.title("Best fitnesses across the generations during parameter tuning", fontsize=12)
             plt.xlabel("Generation (#)", fontsize=12)
             plt.ylabel("Best fitness", fontsize=12)
-            
+
             enemies_str = ""
             for enemy in self.enemies:
                 enemies_str += "e" + str(enemy)
@@ -64,8 +64,10 @@ class Visualizer(object):
 
             if self.save_plot:
                 plt.savefig(rel_path, dpi=300)
-            if self.show_plot:    
+            if self.show_plot:
                 plt.show()
+
+            plt.close()
 
         # first determine if there are missing averages due to early convergence
         # if so extend with last mean value found
@@ -74,7 +76,7 @@ class Visualizer(object):
             missing_values = self.max_generations + 1 - group["fitness"].size
             for missing_gen in range(group["fitness"].size, self.max_generations + 1):
                 fitness_sims_gens.loc[(name, missing_gen), :] = fitness_sims_gens.loc[(name, group["fitness"].size - 1)]
-            
+
         # determine mean fitness across the generations with confidence intervals
         fitness_gens = fitness_sims_gens.groupby("generation")
         mean_fitnesses = fitness_gens["fitness"].mean()
@@ -87,10 +89,10 @@ class Visualizer(object):
         for sim, group in best_fits_sim:
             missing_values = self.max_generations + 1 - group["best fit"].size
             for missing_gen in range(group["best fit"].size, self.max_generations + 1):
-                prev_bestfit = self.pd_bestfits_EA[(self.pd_bestfits_EA["simulation"] == sim) 
+                prev_bestfit = self.pd_bestfits_EA[(self.pd_bestfits_EA["simulation"] == sim)
                                             & (self.pd_bestfits_EA["generation"] == missing_gen - 1)]
                 prev_bestfit = prev_bestfit["best fit"]
-                df = pd.DataFrame([[sim, missing_gen, prev_bestfit.iloc[0]]], 
+                df = pd.DataFrame([[sim, missing_gen, prev_bestfit.iloc[0]]],
                                     columns=["simulation", "generation", "best fit"])
                 self.pd_bestfits_EA = self.pd_bestfits_EA.append(df, ignore_index=True)
 
@@ -110,7 +112,7 @@ class Visualizer(object):
         plt.title("Mean and max fitness across the generations")
         plt.xlabel("Generation (#)", fontsize=12)
         plt.ylabel("Fitness", fontsize=12)
-        
+
         enemies_str = ""
         for enemy in self.enemies:
             enemies_str += "e" + str(enemy)
@@ -119,7 +121,7 @@ class Visualizer(object):
 
         if self.save_plot:
             plt.savefig(rel_path, dpi=300)
-        if self.show_plot:    
+        if self.show_plot:
             plt.show()
 
         plt.close()
@@ -129,10 +131,10 @@ class Visualizer(object):
         for sim, group in diversity_sims:
             missing_values = self.max_generations + 1 - group["diversity"].size
             for missing_gen in range(group["diversity"].size, self.max_generations + 1):
-                prev_div = self.pd_div_EA[(self.pd_div_EA["simulation"] == sim) 
+                prev_div = self.pd_div_EA[(self.pd_div_EA["simulation"] == sim)
                                             & (self.pd_div_EA["generation"] == missing_gen - 1)]
                 prev_div = prev_div["diversity"]
-                df = pd.DataFrame([[sim, missing_gen, prev_div.iloc[0]]], 
+                df = pd.DataFrame([[sim, missing_gen, prev_div.iloc[0]]],
                                     columns=["simulation", "generation", "diversity"])
                 self.pd_div_EA = self.pd_div_EA.append(df, ignore_index=True)
 
