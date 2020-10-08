@@ -75,7 +75,7 @@ class MonteCarlo(object):
             elif best_fit >= 0.95 * self.best_fit:
                 distances = [np.linalg.norm(best_sol - curr_best) for curr_best in self.best_sols]
                 if min(distances) / self.GA.L > 0.1:
-                    self.best_sols.append(solution)
+                    self.best_sols.append(best_sol)
                     self.best_fits.append(best_fit)
 
     def save_stats(self, sim, fitnesses, best_fits, diversity_gens):
