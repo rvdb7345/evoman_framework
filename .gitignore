@@ -14,11 +14,19 @@ __pycache__/
 #  Ignore CSV files
 *.csv
 
+# Ignore saved numpy files
+*.npy
+*.npz
+
 # Ignore txt file such as the parameters files to prevent merge conflicts
-# *.txt
+*.txt
 
 # Ignore png files to prevent merge conflicts with saved plots
 *.png
+*.pdf
+
+# word files
+*.docx
 
 # ignore numpy save files
 *.npy
