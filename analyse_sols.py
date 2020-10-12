@@ -282,42 +282,36 @@ if __name__ == "__main__":
     best_sol_NB1, sol_maxdistance_NB1, best_N_sols_NB1, diversity_NB1, most_different_sols_NB1 = load_best_sols(*filenames_NB1, N_best)
     best_sol_NB2, sol_maxdistance_NB2, best_N_sols_NB2, diversity_NB2, most_different_sols_NB2 = load_best_sols(*filenames_NB2, N_best)
     print("Loading finished in {} minutes".format(round((time.time() - start_load) / 60), 2))
-    # print("Diversity DGEA1 is {}".format(round(diversity_dgea1, 4)))
-    # print(best_N_sols_dgea1)
-    # print("=================================================================")
-    # print(best_sol_dgea1)
-    # print("===================================================================")
-    print(most_different_sols_dgea1[-1])
 
-    # print("Run best solutions")
-    # start_run = time.time()
-    # results_dgea1 = run_solutions(filenames_dgea1[0], reps, best_N_sols_dgea1)
-    # _, _, mean_indgain_dgea1, best_solution_dgea1, best_indgain_dgea1 = results_dgea1
+    print("Run best solutions")
+    start_run = time.time()
+    results_dgea1 = run_solutions(filenames_dgea1[0], reps, best_N_sols_dgea1)
+    _, _, mean_indgain_dgea1, best_solution_dgea1, best_indgain_dgea1 = results_dgea1
 
-    # results_dgea2 = run_solutions(filenames_dgea2[0], reps, best_N_sols_dgea2)
-    # _, _, mean_indgain_dgea2, best_solution_dgea2, best_indgain_dgea2 = results_dgea2
+    results_dgea2 = run_solutions(filenames_dgea2[0], reps, best_N_sols_dgea2)
+    _, _, mean_indgain_dgea2, best_solution_dgea2, best_indgain_dgea2 = results_dgea2
 
-    # results_NB1 = run_solutions(filenames_NB1[0], reps, best_N_sols_NB1)
-    # _, _, mean_indgain_NB1, best_solution_NB1, best_indgain_NB1 = results_NB1
+    results_NB1 = run_solutions(filenames_NB1[0], reps, best_N_sols_NB1)
+    _, _, mean_indgain_NB1, best_solution_NB1, best_indgain_NB1 = results_NB1
 
-    # results_NB2 = run_solutions(filenames_NB2[0], reps, best_N_sols_NB2)
-    # _, _, mean_indgain_NB2, best_solution_NB2, best_indgain_NB2 = results_NB2
-    # print("Run best solutions finished in {} minutes".format(round((time.time() - start_run) / 60), 2))
+    results_NB2 = run_solutions(filenames_NB2[0], reps, best_N_sols_NB2)
+    _, _, mean_indgain_NB2, best_solution_NB2, best_indgain_NB2 = results_NB2
+    print("Run best solutions finished in {} minutes".format(round((time.time() - start_run) / 60), 2))
 
-    # print("Determine statistics")
-    # start_stats = time.time()
-    # results_stats = statistical_tests(
-    #     mean_indgain_dgea1, mean_indgain_dgea2, 
-    #     mean_indgain_NB1, mean_indgain_NB2
-    # )
-    # print("Stats finished in {} minutes".format(round((time.time() - start_stats) / 60), 2))
+    print("Determine statistics")
+    start_stats = time.time()
+    results_stats = statistical_tests(
+        mean_indgain_dgea1, mean_indgain_dgea2, 
+        mean_indgain_NB1, mean_indgain_NB2
+    )
+    print("Stats finished in {} minutes".format(round((time.time() - start_stats) / 60), 2))
 
-    # print("Make boxplot")
-    # start_box = time.time()
-    # make_boxplot(mean_indgain_dgea1, mean_indgain_dgea2, mean_indgain_NB1, mean_indgain_NB2)
-    # print("Boxplot finished in {} minutes".format(round((time.time() - start_box) / 60), 2))
+    print("Make boxplot")
+    start_box = time.time()
+    make_boxplot(mean_indgain_dgea1, mean_indgain_dgea2, mean_indgain_NB1, mean_indgain_NB2)
+    print("Boxplot finished in {} minutes".format(round((time.time() - start_box) / 60), 2))
     
-    # print("Total script ran in {} minutes".format(round((time.time() - start_load) / 60, 2)))
+    print("Total script ran in {} minutes".format(round((time.time() - start_load) / 60, 2)))
 
     # # run best solution ansd the most different one
     # results_best_diff_dgea1 = run_solutions("best_and_diff_dgea1", reps, [best_sol_dgea1, sol_maxdistance_dgea1])
