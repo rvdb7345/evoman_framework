@@ -198,7 +198,7 @@ class BasicGA(object):
 
             # mutation
             if np.random.uniform() < self.mutation_prob:
-                child += np.random.normal()
+                child += np.random.normal(0, 0.25)
 
             # make sure variables represent probalities (interval (0, 1))
             child = np.clip(child, 0.0000001, 0.9999999)
@@ -249,8 +249,6 @@ class BasicGA(object):
         gen = 0
         population = self.make_initial_population()
         pop_size = population.shape[0]
-
-        print(pop_size)
 
         scores = self.play(population, gen)
         self.update_data(gen, population, scores)
